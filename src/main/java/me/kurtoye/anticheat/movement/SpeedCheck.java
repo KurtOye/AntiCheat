@@ -1,5 +1,6 @@
-package me.kurtoye.anticheat;
+package me.kurtoye.anticheat.movement;
 
+import me.kurtoye.anticheat.Anticheat;
 import me.kurtoye.anticheat.utilities.PingUtil;
 import me.kurtoye.anticheat.utilities.TeleportHandler;
 import me.kurtoye.anticheat.utilities.TpsUtil;

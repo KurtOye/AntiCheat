@@ -1,5 +1,6 @@
 package me.kurtoye.anticheat;
 
+import me.kurtoye.anticheat.movement.SpeedCheck;
 import me.kurtoye.anticheat.utilities.TeleportHandler;
 import org.bukkit.plugin.java.JavaPlugin;
 
