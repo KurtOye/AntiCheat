@@ -11,12 +11,14 @@ public class Anticheat extends JavaPlugin {
     @Override
     public void onEnable() {
         // Initialize handlers
-        speedCheck = new SpeedCheck(this, teleportHandler);
         teleportHandler = new TeleportHandler(this);
+        speedCheck = new SpeedCheck(this, teleportHandler);
+
 
         // Register event listeners
-        getServer().getPluginManager().registerEvents(speedCheck, this);
         getServer().getPluginManager().registerEvents(teleportHandler, this);
+        getServer().getPluginManager().registerEvents(speedCheck, this);
+
 
         // Optionally start any periodic tasks or additional initialization here
         startPeriodicTasks();
