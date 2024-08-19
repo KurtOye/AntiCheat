@@ -1,6 +1,5 @@
 package me.kurtoye.anticheat.utilities;
 
-import me.kurtoye.anticheat.Anticheat;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -13,10 +12,8 @@ import java.util.UUID;
 public class TeleportHandler implements Listener {
 
     private final Map<UUID, Long> lastTeleportTime = new HashMap<>();
-    private final Anticheat plugin;
 
-    public TeleportHandler(Anticheat plugin) {
-        this.plugin = plugin;
+    public TeleportHandler() {
     }
 
     @EventHandler

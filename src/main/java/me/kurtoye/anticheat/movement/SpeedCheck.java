@@ -17,6 +17,7 @@ import org.bukkit.util.Vector;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 public class SpeedCheck implements Listener {
@@ -24,6 +25,7 @@ public class SpeedCheck implements Listener {
     private final Map<UUID, Vector> lastPosition = new HashMap<>();
     private final Map<UUID, Long> lastCheckTime = new HashMap<>();
     private final Map<UUID, Long> lastVelocityChangeTime = new HashMap<>();
+
     private final TeleportHandler teleportHandler;
     private final Anticheat plugin;
 
@@ -38,7 +40,7 @@ public class SpeedCheck implements Listener {
         UUID playerId = player.getUniqueId();
 
         if (player.getGameMode() != GameMode.SURVIVAL && player.getGameMode() != GameMode.ADVENTURE) {
-            return;
+            return; //Ignore players that aren't in survival/adventure mode
         }
 
         if (player.isFlying() || player.getGameMode() == GameMode.CREATIVE || player.getGameMode() == GameMode.SPECTATOR) {
@@ -46,13 +48,26 @@ public class SpeedCheck implements Listener {
         }
 
         Vector currentPosition = event.getTo().toVector();
+        currentPosition.setY(0f); // To remove vertical considerations from the calculation.
         long currentTime = System.currentTimeMillis();
 
         if (lastPosition.containsKey(playerId)) {
             long elapsedTime = currentTime - lastCheckTime.getOrDefault(playerId, currentTime);
+
             if (elapsedTime >= 1000) { // Check every second
+
+
                 Vector lastPos = lastPosition.get(playerId);
+                lastPos.setY(0f); // To remove vertical considerations from the calculation
                 double distance = currentPosition.distance(lastPos);
+
+                // Convert elapsed time from milliseconds to seconds
+                double timeInSeconds = elapsedTime / 1000.0;
+
+                // Calculate speed in meters per second (m/s)
+                double speed = distance / timeInSeconds;
+
+                // Update stored values
                 lastPosition.put(playerId, currentPosition);
                 lastCheckTime.put(playerId, currentTime);
 
@@ -71,11 +86,16 @@ public class SpeedCheck implements Listener {
 
                 // Perform speed check
                 double maxSpeed = getMaxAllowedSpeed(player);
-                double pingCompensationFactor = PingUtil.getPingCompensationFactor(player);
+                // double pingCompensationFactor = PingUtil.getPingCompensationFactor(player); Need to fix and add with multiplier like TPS
                 double tpsCompensationFactor = TpsUtil.getTpsCompensationFactor();
-                if (distance > maxSpeed * pingCompensationFactor * tpsCompensationFactor) {
+
+                // Calculate the maximum allowed speed considering ping and TPS
+                double adjustedMaxSpeed = maxSpeed * tpsCompensationFactor;
+
+                if (speed > adjustedMaxSpeed) {
                     // Handle the speed violation (e.g., notify staff, kick player, etc.)
                     player.sendMessage("Speed hack detected!");
+                    plugin.getLogger().info("Player " + player.getName() + " speed: " + speed + " m/s (max allowed: " + adjustedMaxSpeed + " m/s)");
                 }
             }
         } else {
@@ -86,73 +106,71 @@ public class SpeedCheck implements Listener {
 
     @EventHandler
     public void onEntityDamage(EntityDamageEvent event) {
-        if (event.getEntity() instanceof Player) {
-            Player player = (Player) event.getEntity();
+        if (event.getEntity() instanceof Player player) {
             UUID playerId = player.getUniqueId();
             lastVelocityChangeTime.put(playerId, System.currentTimeMillis());
         }
     }
 
     private double getMaxAllowedSpeed(Player player) {
-        double baseSpeed = 0.215; // Default walking speed
+
+        double baseSpeed = 4.8; // Default walking speed
         if (player.isSprinting()) {
-            baseSpeed = 0.2806; // Default sprinting speed
+            baseSpeed = 6.1; // Default sprinting speed
+            if (player.getVelocity().getY() > 0 || !player.isOnGround()) {
+                baseSpeed = 7.6;
+            }
         }
 
         // Adjust for potion effects
         if (player.hasPotionEffect(PotionEffectType.SPEED)) {
-            int amplifier = player.getPotionEffect(PotionEffectType.SPEED).getAmplifier();
-            baseSpeed += 0.1 * (amplifier + 1);
+            int amplifier = Objects.requireNonNull(player.getPotionEffect(PotionEffectType.SPEED)).getAmplifier();
+            baseSpeed *= amplifier;
         }
 
         if (player.hasPotionEffect(PotionEffectType.SLOWNESS)) {
-            int amplifier = player.getPotionEffect(PotionEffectType.SLOWNESS).getAmplifier();
-            baseSpeed -= 0.15 * (amplifier + 1);
+            int amplifier = Objects.requireNonNull(player.getPotionEffect(PotionEffectType.SLOWNESS)).getAmplifier();
+            baseSpeed *= amplifier;
         }
 
         // Adjust for terrain
         Material material = player.getLocation().getBlock().getType();
         if (material == Material.ICE || material == Material.PACKED_ICE || material == Material.BLUE_ICE) {
-            baseSpeed *= 1.3;
+            baseSpeed *= 1.6;
         } else if (material == Material.SOUL_SAND || material == Material.SOUL_SOIL) {
-            baseSpeed *= 0.4;
-        }
+            baseSpeed *= 0.6;
 
-        // Adjust for vehicles
-        if (player.isInsideVehicle()) {
-            baseSpeed = 0.4; // Example speed for boats, adjust as necessary
+            // Soul Speed
+            if (player.getInventory().getBoots() != null && player.getInventory().getBoots().containsEnchantment(Enchantment.SOUL_SPEED)) {
+                int level = player.getInventory().getBoots().getEnchantmentLevel(Enchantment.SOUL_SPEED);
+                baseSpeed *= 1.2 + (0.2 * level);
+            }
         }
 
         // Elytra
         if (player.isGliding()) {
-            baseSpeed = 1.5; // Adjust as necessary for Elytra flight
+            baseSpeed = 31; // Adjust as necessary for Elytra flight
         }
 
         // Depth Strider
         if (player.getInventory().getBoots() != null && player.getInventory().getBoots().containsEnchantment(Enchantment.DEPTH_STRIDER)) {
             int level = player.getInventory().getBoots().getEnchantmentLevel(Enchantment.DEPTH_STRIDER);
-            baseSpeed *= 1 + (0.33 * level);
-        }
-
-        // Soul Speed
-        if (player.getInventory().getBoots() != null && player.getInventory().getBoots().containsEnchantment(Enchantment.SOUL_SPEED)) {
-            int level = player.getInventory().getBoots().getEnchantmentLevel(Enchantment.SOUL_SPEED);
-            baseSpeed *= 1 + (0.2 * level);
+            baseSpeed *= 1.2 + (0.33 * level);
         }
 
         // Sneaking
         if (player.isSneaking()) {
-            baseSpeed *= 0.3; // Adjust as necessary for sneaking
+            baseSpeed *= 0.5; // Adjust as necessary for sneaking
         }
 
         // Swimming
         if (player.isSwimming()) {
-            baseSpeed *= 1.5; // Adjust as necessary for swimming
+            baseSpeed *= 1.7; // Adjust as necessary for swimming
         }
 
         // Cobwebs
         if (material == Material.COBWEB) {
-            baseSpeed *= 0.25; // Adjust as necessary for cobwebs
+            baseSpeed *= 0.45; // Adjust as necessary for cobwebs
         }
 
         return baseSpeed;

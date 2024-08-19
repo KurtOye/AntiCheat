@@ -12,7 +12,7 @@ public class Anticheat extends JavaPlugin {
     @Override
     public void onEnable() {
         // Initialize handlers
-        teleportHandler = new TeleportHandler(this);
+        teleportHandler = new TeleportHandler();
         speedCheck = new SpeedCheck(this, teleportHandler);
 
 
@@ -34,7 +34,4 @@ public class Anticheat extends JavaPlugin {
         // Example of adding periodic tasks if needed
     }
 
-    public TeleportHandler getTeleportHandler(){
-        return teleportHandler;
-    }
 }
