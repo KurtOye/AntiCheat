@@ -17,16 +17,15 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * JesusCheck detects **unnatural water-walking**, including sprint-jumping and bouncing.
+ * JesusCheck detects **unnatural water-walking**, including sprint-jumping.
  * ✅ Uses `WaterMovementUtil` for **all water-based logic**.
  * ✅ Uses `VelocityUtil` to **avoid false positives from acceleration & vertical movement**.
- * ✅ Allows **bouncing on water within a realistic range**.
  * ✅ Ensures **proper tracking reset when leaving water, teleporting, or using ladders/vines**.
- * ✅ Accounts for **Frost Walker, Depth Strider, boats, and Dolphin’s Grace**.
  */
 public class JesusCheck implements Listener {
 
     private final Map<UUID, Long> waterWalkStartTime = new HashMap<>();
+    private final Map<UUID, Double> lastYVelocity = new HashMap<>();
     private final Map<UUID, Long> lastVelocityChangeTime = new HashMap<>();
     private final Map<UUID, Long> lastTeleport = new HashMap<>();
 
@@ -34,6 +33,7 @@ public class JesusCheck implements Listener {
     private static final double MAX_ALLOWED_ACCELERATION = 3.5; // Prevents acceleration false positives
     private static final double MIN_BOUNCE_VELOCITY = -0.12; // Minimum velocity to ignore natural bouncing
     private static final double MAX_BOUNCE_VELOCITY = 0.12; // Maximum velocity to ignore natural bouncing
+    private static final double MAX_SPRINT_JUMP_VELOCITY = 0.42; // Normal jump Y velocity
 
     private final TeleportHandler teleportHandler;
     private final Anticheat plugin;
@@ -54,7 +54,6 @@ public class JesusCheck implements Listener {
      * ✅ Uses `WaterMovementUtil` to correctly detect **water-based movement**.
      * ✅ Uses `VelocityUtil` to ensure **knockback and acceleration aren't interfering**.
      * ✅ Resets movement tracking properly **when leaving water or teleporting**.
-     * ✅ Handles **Depth Strider, Dolphin’s Grace, Frost Walker, and boats** to prevent false positives.
      */
     @EventHandler
     public void onPlayerMove(PlayerMoveEvent event) {
@@ -80,9 +79,27 @@ public class JesusCheck implements Listener {
             return;
         }
 
+        // ✅ **Detect sprint-jumping exploits**
+        if (WaterMovementUtil.isPlayerSprintJumpingOnWater(player)) {
+            if (!lastYVelocity.containsKey(playerId)) {
+                lastYVelocity.put(playerId, verticalVelocity);
+            }
+
+            // ✅ **Check if the player ever sinks below -0.08**
+            if (verticalVelocity < -0.08) {
+                lastYVelocity.put(playerId, verticalVelocity);
+            }
+
+            // ✅ **Flag only if the player maintains jump velocity and never sinks**
+            if (lastYVelocity.get(playerId) > -0.08 && verticalVelocity >= 0.08) {
+                CheatReportUtil.reportCheat(player, plugin, "Jesus Hack (Sprint-Jumping Exploit)");
+            }
+
+            return;
+        }
+
         // ✅ **Reset tracking when player leaves water or uses ladders/vines**
-        if (!WaterMovementUtil.isPlayerRunningOnWater(player) &&
-                !WaterMovementUtil.isPlayerSprintJumpingOnWater(player)) {
+        if (!WaterMovementUtil.isPlayerRunningOnWater(player)) {
             waterWalkStartTime.remove(playerId);
             return;
         }
