@@ -7,7 +7,9 @@ public class TpsUtil {
     // Retrieve the server's TPS
     public static double getTpsCompensationFactor() {
         double tps = getServerTPS(); // Get the server TPS
-        return tps / 20.0; // Assume 20 TPS is normal
+
+        // Allow leniency but avoid drastic speed increases
+        return Math.max(0.7, (0.5 + (tps / 40.0)));
     }
 
     // Get the server TPS (0 index is the last 1 minute TPS)

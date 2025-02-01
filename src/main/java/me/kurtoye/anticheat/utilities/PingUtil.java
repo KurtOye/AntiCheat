@@ -9,20 +9,16 @@ public class PingUtil {
     // Retrieve the ping of a player
     public static double getPingCompensationFactor(Player player) {
         int ping = getPing(player);
+        if (ping < 0) return 1.0;
 
-        if (ping < 0) {
-            return 1.0;
-        }
-
-        return 1.0 + (ping / 1000.0); // Example: 100ms ping adds 10% tolerance
+        // Apply a logarithmic scaling instead of linear
+        return 1.0 + (Math.log10(ping + 1) / 2.0);
     }
 
     // Get the ping of the player (version-specific)
     public static int getPing(Player player) {
         try {
-            Object entityPlayer = player.getClass().getMethod("getHandle").invoke(player);
-            Field pingField = entityPlayer.getClass().getDeclaredField("ping");
-            return pingField.getInt(entityPlayer);
+            return player.getPing(); // ✅ This works on PaperMC 1.18+
         } catch (Exception e) {
             e.printStackTrace();
             return -1;
