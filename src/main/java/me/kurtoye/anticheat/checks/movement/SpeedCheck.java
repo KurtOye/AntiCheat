@@ -2,6 +2,7 @@ package me.kurtoye.anticheat.checks.movement;
 
 import me.kurtoye.anticheat.Anticheat;
 import me.kurtoye.anticheat.utilities.MovementUtil;
+import me.kurtoye.anticheat.utilities.VelocityUtil;
 import me.kurtoye.anticheat.utilities.CheatReportUtil;
 import me.kurtoye.anticheat.utilities.PingUtil;
 import me.kurtoye.anticheat.utilities.TpsUtil;
@@ -19,9 +20,10 @@ import java.util.UUID;
 
 /**
  * SpeedCheck detects excessive movement speed in Minecraft players.
- * - Uses `CheatReportUtil` for cheat reporting (prevents spam, ensures consistency).
- * - Tracks acceleration to improve false positive detection.
- * - Fully integrates with `MovementUtil` and `TeleportHandler`.
+ * - Uses `VelocityUtil` for **acceleration tracking** and **knockback handling**.
+ * - Uses `CheatReportUtil` for **consistent cheat logging**.
+ * - Uses `MovementUtil` for **fundamental movement mechanics**.
+ * - Prevents false positives while accurately detecting speed hacks.
  */
 public class SpeedCheck implements Listener {
 
@@ -35,8 +37,7 @@ public class SpeedCheck implements Listener {
     private final TeleportHandler teleportHandler;
     private final Anticheat plugin;
 
-    private static final double ACCELERATION_THRESHOLD = 6.0; // Max allowed sudden acceleration
-    private static final int MAX_VIOLATIONS = 3; // Number of times a player must exceed limits before flagging
+    private static final int MAX_VIOLATIONS = 3; // Number of violations before flagging
     private static final long VIOLATION_RESET_TIME = 10000; // 10 seconds before violations reset
 
     /**
@@ -53,10 +54,9 @@ public class SpeedCheck implements Listener {
     /**
      * Detects speed hacks by measuring movement distance over time.
      *
-     * ✅ Ignores **all fundamental movement mechanics** (teleports, knockback, boats, Elytra, ice, etc.).
-     * ✅ Uses `CheatReportUtil` for **consistent cheat logging**.
-     * ✅ Introduces **acceleration tracking** to catch **gradual** speed increases.
-     * ✅ Uses **progressive violation tracking** to avoid flagging borderline cases.
+     * ✅ Uses `VelocityUtil` for **knockback tracking & acceleration validation**.
+     * ✅ Uses `CheatReportUtil` for **modular cheat reporting**.
+     * ✅ Ensures **teleportation & lag compensation are handled properly**.
      */
     @EventHandler
     public void onPlayerMove(PlayerMoveEvent event) {
@@ -102,7 +102,7 @@ public class SpeedCheck implements Listener {
         lastSpeed.put(playerId, speed);
 
         // ✅ **Acceleration tracking to catch gradual speed hacks**
-        if (acceleration > ACCELERATION_THRESHOLD) {
+        if (VelocityUtil.shouldIgnoreSpeedCheck(acceleration)) {
             CheatReportUtil.reportCheat(player, plugin, "Speed Hack (Abnormal Acceleration)");
             return;
         }

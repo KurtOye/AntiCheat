@@ -2,7 +2,6 @@ package me.kurtoye.anticheat.utilities;
 
 import me.kurtoye.anticheat.handlers.TeleportHandler;
 import org.bukkit.GameMode;
-import org.bukkit.Material;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
@@ -10,12 +9,22 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Shared movement validation utility for all anti-cheat checks.
+ * MovementUtil provides **general movement validation** shared across all anti-cheat checks.
+ * - Used in **SpeedCheck, JesusCheck, and future movement-related checks**.
+ * - Delegates **water movement** to `WaterMovementUtil`.
+ * - Delegates **knockback/acceleration** to `VelocityUtil`.
  */
 public class MovementUtil {
 
     /**
-     * Determines if movement checks should be ignored based on various conditions.
+     * Determines whether movement checks should be **ignored** based on various conditions.
+     * - **Ignores** creative/spectator mode, riding entities, teleportation, knockback.
+     *
+     * @param player The player being checked
+     * @param teleportHandler Shared teleport handler
+     * @param lastVelocityChangeTime Tracks knockback history
+     * @param lastTeleport Tracks teleport history
+     * @return true if movement should be ignored
      */
     public static boolean shouldIgnoreMovement(Player player, TeleportHandler teleportHandler,
                                                Map<UUID, Long> lastVelocityChangeTime,
@@ -28,26 +37,29 @@ public class MovementUtil {
                 player.isFlying() ||
                 isRidingMount(player) ||
                 teleportHandler.isRecentTeleport(playerId, currentTime) ||
-                wasRecentlyHit(playerId, currentTime, lastVelocityChangeTime) ||
+                VelocityUtil.wasRecentlyHit(playerId, currentTime, lastVelocityChangeTime) ||
                 wasRecentlyTeleported(playerId, currentTime, lastTeleport);
     }
 
     /**
-     * Checks if the player was recently hit (knockback protection).
-     */
-    private static boolean wasRecentlyHit(UUID playerId, long currentTime, Map<UUID, Long> lastVelocityChangeTime) {
-        return lastVelocityChangeTime.containsKey(playerId) && (currentTime - lastVelocityChangeTime.get(playerId)) < 1200;
-    }
-
-    /**
-     * Checks if the player was recently teleported (teleport protection).
+     * Checks if the player was recently teleported.
+     * - Ensures movement detection resets **after teleportation**.
+     *
+     * @param playerId The player's UUID
+     * @param currentTime Current system time
+     * @param lastTeleport Map tracking recent teleports
+     * @return true if the player was teleported recently
      */
     private static boolean wasRecentlyTeleported(UUID playerId, long currentTime, Map<UUID, Long> lastTeleport) {
         return lastTeleport.containsKey(playerId) && (currentTime - lastTeleport.get(playerId)) < 3000;
     }
 
     /**
-     * Determines if the player is riding a mount (e.g., horse, boat, minecart).
+     * Determines if the player is riding an entity.
+     * - Prevents movement checks when the player is in **boats, horses, minecarts, etc.**.
+     *
+     * @param player The player being checked
+     * @return true if the player is riding a mount
      */
     private static boolean isRidingMount(Player player) {
         Entity vehicle = player.getVehicle();
@@ -60,21 +72,11 @@ public class MovementUtil {
     }
 
     /**
-     * Determines if the player's movement on water is legitimate.
-     */
-    public static boolean isLegitWaterMovement(Player player) {
-        Material blockAtFeet = player.getLocation().getBlock().getType();
-        Material blockBelow = player.getLocation().subtract(0, 1, 0).getBlock().getType();
-
-        return player.isSwimming() ||
-                blockAtFeet == Material.WATER ||
-                blockBelow == Material.BUBBLE_COLUMN ||
-                blockBelow == Material.LILY_PAD ||
-                player.isGliding();
-    }
-
-    /**
-     * Calculates the maximum allowed speed based on movement type and environment.
+     * Calculates the **maximum allowed speed** for a player.
+     * - Considers movement type, enchantments, terrain effects.
+     *
+     * @param player The player being checked
+     * @return The maximum allowed speed for the player
      */
     public static double getMaxAllowedSpeed(Player player) {
         double baseSpeed = 5.5;
@@ -89,17 +91,19 @@ public class MovementUtil {
     }
 
     /**
-     * Adjusts speed based on terrain (e.g., ice, soul sand).
+     * Applies **terrain modifiers** to the player's movement speed.
+     * - Adjusts speed for **ice, soul sand, mud, honey blocks**.
+     *
+     * @param player The player being checked
+     * @param baseSpeed The base speed before modifications
+     * @return The adjusted speed after terrain effects
      */
     private static double applyEnvironmentModifiers(Player player, double baseSpeed) {
-        Material material = player.getLocation().getBlock().getType();
-
-        if (material == Material.ICE || material == Material.PACKED_ICE || material == Material.BLUE_ICE) {
-            baseSpeed *= 1.6;
-        } else if (material == Material.SOUL_SAND || material == Material.MUD) {
-            baseSpeed *= 0.65;
+        switch (player.getLocation().getBlock().getType()) {
+            case ICE, PACKED_ICE, BLUE_ICE -> baseSpeed *= 1.6;
+            case SOUL_SAND, MUD -> baseSpeed *= 0.65;
+            case HONEY_BLOCK -> baseSpeed *= 0.35;
         }
-
         return baseSpeed;
     }
 }

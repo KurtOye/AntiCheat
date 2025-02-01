@@ -16,8 +16,8 @@ public class CheatReportUtil {
     private static final Map<UUID, Long> lastWarningTime = new HashMap<>();
     private static final Map<UUID, Long> lastLogTime = new HashMap<>();
 
-    private static final long CHAT_COOLDOWN = 5000; // 5 seconds
-    private static final long LOG_COOLDOWN = 10000; // 10 seconds
+    private static final long CHAT_COOLDOWN = 2500; // 5 seconds
+    private static final long LOG_COOLDOWN = 5000; // 10 seconds
 
     /**
      * Reports a detected cheat with cooldowns to prevent spam.

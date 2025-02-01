@@ -1,50 +1,50 @@
 package me.kurtoye.anticheat;
 
-import me.kurtoye.anticheat.checks.movement.FlyCheck;
-import me.kurtoye.anticheat.checks.movement.JesusCheck;
-import me.kurtoye.anticheat.checks.movement.NoFallCheck;
 import me.kurtoye.anticheat.checks.movement.SpeedCheck;
+import me.kurtoye.anticheat.checks.movement.JesusCheck;
 import me.kurtoye.anticheat.handlers.TeleportHandler;
+import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 
+/**
+ * Main AntiCheat plugin class.
+ * - Registers **all movement checks**.
+ * - Initializes **utility handlers**.
+ * - Ensures **future-proofed, modular expansion**.
+ */
 public class Anticheat extends JavaPlugin {
 
-    private SpeedCheck speedCheck;
-    private FlyCheck flyCheck;
-    private JesusCheck jesusCheck;
-    private NoFallCheck noFallCheck;
     private TeleportHandler teleportHandler;
 
+    /**
+     * Called when the plugin is enabled.
+     * - Registers event listeners.
+     * - Initializes teleport handler.
+     */
     @Override
     public void onEnable() {
-        // Initialize handlers
-        teleportHandler = new TeleportHandler();
+        this.teleportHandler = new TeleportHandler();
 
-        // Initialize movement checks
-        speedCheck = new SpeedCheck(this, teleportHandler);
-       // flyCheck = new FlyCheck(this);
-        jesusCheck = new JesusCheck(this);
-        noFallCheck = new NoFallCheck(this);
-
-        // Register event listeners
-        getServer().getPluginManager().registerEvents(teleportHandler, this);
-        getServer().getPluginManager().registerEvents(speedCheck, this);
-        //getServer().getPluginManager().registerEvents(flyCheck, this);
-        getServer().getPluginManager().registerEvents(jesusCheck, this);
-        getServer().getPluginManager().registerEvents(noFallCheck, this);
-
-        // Start background tasks if needed
-        startPeriodicTasks();
+        registerChecks();
 
         getLogger().info("✅ AntiCheat Plugin Enabled!");
     }
 
+    /**
+     * Called when the plugin is disabled.
+     * - Cleans up plugin resources.
+     */
     @Override
     public void onDisable() {
         getLogger().info("❌ AntiCheat Plugin Disabled!");
     }
 
-    private void startPeriodicTasks() {
-        // Example of adding periodic tasks if needed
+    /**
+     * Registers all movement detection checks.
+     * - Ensures all checks **share the same TeleportHandler**.
+     */
+    private void registerChecks() {
+        Bukkit.getPluginManager().registerEvents(new SpeedCheck(this, teleportHandler), this);
+        Bukkit.getPluginManager().registerEvents(new JesusCheck(this, teleportHandler), this);
     }
 }
