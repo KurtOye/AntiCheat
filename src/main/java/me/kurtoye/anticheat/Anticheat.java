@@ -1,5 +1,7 @@
 package me.kurtoye.anticheat;
 
+import me.kurtoye.anticheat.checks.chat.CommandAbuseCheck;
+import me.kurtoye.anticheat.checks.chat.ChatSpamCheck;
 import me.kurtoye.anticheat.checks.movement.SpeedCheck;
 import me.kurtoye.anticheat.checks.movement.JesusCheck;
 import me.kurtoye.anticheat.handlers.TeleportHandler;
@@ -44,6 +46,8 @@ public class Anticheat extends JavaPlugin {
      * - Ensures all checks **share the same TeleportHandler**.
      */
     private void registerChecks() {
+        Bukkit.getPluginManager().registerEvents(new CommandAbuseCheck(this), this);
+        Bukkit.getPluginManager().registerEvents(new ChatSpamCheck(this), this);
         Bukkit.getPluginManager().registerEvents(new SpeedCheck(this, teleportHandler), this);
         Bukkit.getPluginManager().registerEvents(new JesusCheck(this, teleportHandler), this);
     }
