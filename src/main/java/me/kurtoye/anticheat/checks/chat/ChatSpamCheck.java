@@ -2,6 +2,8 @@ package me.kurtoye.anticheat.checks.chat;
 
 import me.kurtoye.anticheat.Anticheat;
 import me.kurtoye.anticheat.utilities.CheatReportUtil;
+import me.kurtoye.anticheat.utilities.SuspicionManager;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -12,33 +14,41 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * ChatSpammingCheck detects **excessive or repeated chat messages**.
- * ✅ Uses `CheatReportUtil` for **spam warnings & cooldown tracking**.
- * ✅ Prevents **false positives by allowing natural typing variations**.
+ * 🚀 Refined ChatSpamCheck:
+ * - Integrates incremental suspicion scoring (vs. instant flags).
+ * - Uses config-based tuning for spam thresholds & suspicion points.
+ * - Minimizes false positives by checking repeated messages and fast chat.
  */
 public class ChatSpamCheck implements Listener {
 
+    // COOL-DOWN related
+    private final long chatCooldown;
+    private final int maxSpamCount;
+
+    // SUSPICION
+    private final int chatCooldownSuspicionPoints;  // suspicion increment for cooldown violations
+    private final int repeatedMsgSuspicionPoints;   // suspicion increment for repeated message spam
+
+    // TRACKING
     private final Map<UUID, Long> lastChatTime = new HashMap<>();
     private final Map<UUID, String> lastMessage = new HashMap<>();
     private final Map<UUID, Integer> spamCount = new HashMap<>();
 
-    private static final long CHAT_COOLDOWN = 500; // 0.5 seconds
-    private static final int MAX_SPAM_COUNT = 5; // Max repeated messages before flagging
-
     private final Anticheat plugin;
 
-    /**
-     * Constructor for ChatSpamCheck.
-     *
-     * @param plugin The main plugin instance.
-     */
     public ChatSpamCheck(Anticheat plugin) {
         this.plugin = plugin;
+        FileConfiguration config = plugin.getConfig();
+
+        // Cooldown config
+        this.chatCooldown = config.getLong("chatspam.cooldown", 500);       // Default: 2 seconds
+        this.maxSpamCount = config.getInt("chatspam.max_repeats", 5);        // Default: 3 repeated messages
+
+        // Suspicion increments (config-based)
+        this.chatCooldownSuspicionPoints = config.getInt("chatspam.cooldown_suspicion_points", 2);
+        this.repeatedMsgSuspicionPoints  = config.getInt("chatspam.repeated_suspicion_points", 2);
     }
 
-    /**
-     * Listens for player chat messages and detects spam patterns.
-     */
     @EventHandler
     public void onPlayerChat(AsyncPlayerChatEvent event) {
         Player player = event.getPlayer();
@@ -46,32 +56,51 @@ public class ChatSpamCheck implements Listener {
         long currentTime = System.currentTimeMillis();
         String message = event.getMessage();
 
-        // ✅ **Check for cooldown spam**
+        // 1) Check for chat cooldown spam
         if (lastChatTime.containsKey(playerId)) {
             long timeSinceLastMessage = currentTime - lastChatTime.get(playerId);
-            if (timeSinceLastMessage < CHAT_COOLDOWN) {
-                event.setCancelled(true); // Cancel excessive chat
-                CheatReportUtil.reportCheat(player, plugin, "Chat Spam (Cooldown Violation)");
+            if (timeSinceLastMessage < chatCooldown) {
+                // Instead of immediate punish, add suspicion
+                int suspicion = SuspicionManager.addSuspicionPoints(
+                        playerId,
+                        chatCooldownSuspicionPoints,
+                        "ChatSpam (Cooldown Violation)"
+                );
+                // Let the suspicion manager escalate if needed
+                CheatReportUtil.handleSuspicionPunishment(player, plugin, "Chat Spam (Cooldown)", suspicion);
+
+                // Cancel the chat event
+                event.setCancelled(true);
                 return;
             }
         }
 
-        // ✅ **Check for repeated message spam**
+        // 2) Check repeated message spam
         if (lastMessage.containsKey(playerId) && lastMessage.get(playerId).equalsIgnoreCase(message)) {
-            int count = spamCount.getOrDefault(playerId, 0) + 1;
-            spamCount.put(playerId, count);
+            int newCount = spamCount.getOrDefault(playerId, 0) + 1;
+            spamCount.put(playerId, newCount);
 
-            if (count >= MAX_SPAM_COUNT) {
+            if (newCount >= maxSpamCount) {
+                // Instead of direct flagging, add suspicion
+                int suspicion = SuspicionManager.addSuspicionPoints(
+                        playerId,
+                        repeatedMsgSuspicionPoints,
+                        "ChatSpam (Repeated Message)"
+                );
+                CheatReportUtil.handleSuspicionPunishment(player, plugin, "Chat Spam (Repeated)", suspicion);
+
+                // Cancel this chat event
                 event.setCancelled(true);
-                CheatReportUtil.reportCheat(player, plugin, "Chat Spam (Repeated Message)");
-                spamCount.put(playerId, 0); // Reset after flagging
+                // Reset the spam counter
+                spamCount.put(playerId, 0);
                 return;
             }
         } else {
-            spamCount.put(playerId, 0); // Reset if the message is different
+            // If new message is different, reset spam count
+            spamCount.put(playerId, 0);
         }
 
-        // ✅ **Update last message tracking**
+        // 3) Update last chat data
         lastChatTime.put(playerId, currentTime);
         lastMessage.put(playerId, message);
     }

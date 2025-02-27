@@ -1,12 +1,10 @@
+
 package me.kurtoye.anticheat.checks.movement;
 
 import me.kurtoye.anticheat.Anticheat;
-import me.kurtoye.anticheat.utilities.MovementUtil;
-import me.kurtoye.anticheat.utilities.VelocityUtil;
-import me.kurtoye.anticheat.utilities.CheatReportUtil;
-import me.kurtoye.anticheat.utilities.PingUtil;
-import me.kurtoye.anticheat.utilities.TpsUtil;
+import me.kurtoye.anticheat.utilities.*;
 import me.kurtoye.anticheat.handlers.TeleportHandler;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -20,58 +18,53 @@ import java.util.UUID;
 
 /**
  * SpeedCheck detects excessive movement speed in Minecraft players.
- * - Uses `VelocityUtil` for **acceleration tracking** and **knockback handling**.
- * - Uses `CheatReportUtil` for **consistent cheat logging**.
- * - Uses `MovementUtil` for **fundamental movement mechanics**.
+ * - Uses VelocityUtil for acceleration tracking and knockback handling.
+ * - Uses CheatReportUtil for consistent cheat logging.
+ * - Uses MovementUtil for fundamental movement mechanics.
  * - Prevents false positives while accurately detecting speed hacks.
+ * - Now integrates with SuspicionManager for progressive suspicion scoring.
  */
 public class SpeedCheck implements Listener {
 
+    // Tracks each player's last known position (for distance-based speed measurement)
     private final Map<UUID, Vector> lastPosition = new HashMap<>();
+    // Tracks the last time a speed check was performed on this player
     private final Map<UUID, Long> lastCheckTime = new HashMap<>();
+    // Records the player's last recorded speed to measure acceleration changes
     private final Map<UUID, Double> lastSpeed = new HashMap<>();
-    private final Map<UUID, Integer> violationCount = new HashMap<>();
+    // Tracks when the player was last affected by knockback
     private final Map<UUID, Long> lastVelocityChangeTime = new HashMap<>();
+    // Records when the player was last teleported (to ignore movement checks briefly)
     private final Map<UUID, Long> lastTeleport = new HashMap<>();
 
     private final TeleportHandler teleportHandler;
     private final Anticheat plugin;
+    private final double violationLeeway;
 
-    private static final int MAX_VIOLATIONS = 3; // Number of violations before flagging
-    private static final long VIOLATION_RESET_TIME = 10000; // 10 seconds before violations reset
-
-    /**
-     * Constructor for SpeedCheck.
-     *
-     * @param plugin The main plugin instance.
-     * @param teleportHandler The teleport handler used to track recent teleports.
-     */
     public SpeedCheck(Anticheat plugin, TeleportHandler teleportHandler) {
         this.plugin = plugin;
         this.teleportHandler = teleportHandler;
+        FileConfiguration config = plugin.getConfig();
+        // Leeway for adjusting maxAllowedSpeed from config
+        this.violationLeeway = config.getDouble("speedcheck.violation_leeway", 1.10);
     }
 
-    /**
-     * Detects speed hacks by measuring movement distance over time.
-     *
-     * ✅ Uses `VelocityUtil` for **knockback tracking & acceleration validation**.
-     * ✅ Uses `CheatReportUtil` for **modular cheat reporting**.
-     * ✅ Ensures **teleportation & lag compensation are handled properly**.
-     */
     @EventHandler
     public void onPlayerMove(PlayerMoveEvent event) {
         Player player = event.getPlayer();
         UUID playerId = player.getUniqueId();
 
-        // ✅ **Ignore movement checks if the player is in a valid state**
+        // Ignore valid states (creative, spectator, recent teleport, knockback, etc.)
         if (MovementUtil.shouldIgnoreMovement(player, teleportHandler, lastVelocityChangeTime, lastTeleport)) {
             return;
         }
 
         Vector currentPosition = event.getTo().toVector();
-        currentPosition.setY(0f);
+        // Remove vertical dimension from speed calculations
+        currentPosition.setY(0);
         long currentTime = System.currentTimeMillis();
 
+        // First time storing player's position
         if (!lastPosition.containsKey(playerId)) {
             lastPosition.put(playerId, currentPosition);
             lastCheckTime.put(playerId, currentTime);
@@ -79,50 +72,48 @@ public class SpeedCheck implements Listener {
         }
 
         long elapsedTime = currentTime - lastCheckTime.get(playerId);
+        // Check once per second for simpler average speed
         if (elapsedTime < 1000) {
             return;
         }
 
-        Vector lastPos = lastPosition.get(playerId);
-        lastPos.setY(0f);
-        double distance = currentPosition.distance(lastPos);
+        Vector previousPosition = lastPosition.get(playerId).clone();
+        previousPosition.setY(0);
+        double distance = currentPosition.distance(previousPosition);
         double speed = distance / (elapsedTime / 1000.0);
 
+        // Update stored info
         lastPosition.put(playerId, currentPosition);
         lastCheckTime.put(playerId, currentTime);
 
-        double maxAllowedSpeed = MovementUtil.getMaxAllowedSpeed(player) * PingUtil.getPingCompensationFactor(player) * TpsUtil.getTpsCompensationFactor() * 1.10;
+        // Calculate maximum allowed speed with ping & TPS compensation
+        double maxAllowedSpeed = MovementUtil.getMaxAllowedSpeed(player)
+                * PingUtil.getPingCompensationFactor(player)
+                * TpsUtil.getTpsCompensationFactor()
+                * violationLeeway;
 
+        // Additional tolerance if player's ping > 300ms
         if (PingUtil.getPing(player) > 300) {
             maxAllowedSpeed *= 1.2;
         }
 
+        // Track acceleration
         double lastRecordedSpeed = lastSpeed.getOrDefault(playerId, 0.0);
         double acceleration = Math.abs(speed - lastRecordedSpeed);
         lastSpeed.put(playerId, speed);
 
-        // ✅ **Acceleration tracking to catch gradual speed hacks**
-        if (VelocityUtil.shouldIgnoreSpeedCheck(acceleration)) {
-            CheatReportUtil.reportCheat(player, plugin, "Speed Hack (Abnormal Acceleration)");
-            return;
-        }
 
-        // ✅ **Progressive violation tracking to avoid false positives**
+        // Core detection: if the speed is above threshold, increment suspicion
         if (speed > maxAllowedSpeed) {
-            int violations = violationCount.getOrDefault(playerId, 0) + 1;
-            violationCount.put(playerId, violations);
-
-            if (violations >= MAX_VIOLATIONS) {
-                CheatReportUtil.reportCheat(player, plugin, "Speed Hack");
-                violationCount.put(playerId, 0); // Reset violations after flagging
-            }
-        } else {
-            violationCount.put(playerId, 0); // Reset violations if player moves normally
+            // Instead of local violation logic, increment suspicion points
+            int suspicion = SuspicionManager.addSuspicionPoints(playerId, 3, "SpeedCheck");
+            CheatReportUtil.handleSuspicionPunishment(player, plugin, "Speed Hack", suspicion);
         }
     }
 
     /**
      * Registers velocity changes (knockback handling).
+     * In case of entity damage, store a knockback grace period.
      */
     @EventHandler
     public void onEntityDamage(EntityDamageEvent event) {

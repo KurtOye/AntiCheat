@@ -2,10 +2,16 @@ package me.kurtoye.anticheat;
 
 import me.kurtoye.anticheat.checks.chat.CommandAbuseCheck;
 import me.kurtoye.anticheat.checks.chat.ChatSpamCheck;
+import me.kurtoye.anticheat.checks.movement.InventoryMoveCheck;
+import me.kurtoye.anticheat.checks.movement.NoFallCheck;
 import me.kurtoye.anticheat.checks.movement.SpeedCheck;
 import me.kurtoye.anticheat.checks.movement.JesusCheck;
+import me.kurtoye.anticheat.checks.player.AutoClickerCheck;
+import me.kurtoye.anticheat.checks.world.FastBreakCheck;
+import me.kurtoye.anticheat.checks.world.FastPlaceCheck;
 import me.kurtoye.anticheat.handlers.TeleportHandler;
 import org.bukkit.Bukkit;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /**
@@ -25,8 +31,10 @@ public class Anticheat extends JavaPlugin {
      */
     @Override
     public void onEnable() {
-        this.teleportHandler = new TeleportHandler();
+        saveDefaultConfig();
+        reloadConfig();
 
+        this.teleportHandler = new TeleportHandler();
         registerChecks();
 
         getLogger().info("✅ AntiCheat Plugin Enabled!");
@@ -46,9 +54,26 @@ public class Anticheat extends JavaPlugin {
      * - Ensures all checks **share the same TeleportHandler**.
      */
     private void registerChecks() {
-        Bukkit.getPluginManager().registerEvents(new CommandAbuseCheck(this), this);
+
+        // Chat
         Bukkit.getPluginManager().registerEvents(new ChatSpamCheck(this), this);
-        Bukkit.getPluginManager().registerEvents(new SpeedCheck(this, teleportHandler), this);
+        Bukkit.getPluginManager().registerEvents(new CommandAbuseCheck(this), this);
+
+        // Combat
+
+        //Movement
+
+        Bukkit.getPluginManager().registerEvents(new InventoryMoveCheck(this, teleportHandler), this);
         Bukkit.getPluginManager().registerEvents(new JesusCheck(this, teleportHandler), this);
+        Bukkit.getPluginManager().registerEvents(new NoFallCheck(this), this);
+        Bukkit.getPluginManager().registerEvents(new SpeedCheck(this, teleportHandler), this);
+
+        //Player
+        Bukkit.getPluginManager().registerEvents(new AutoClickerCheck(this), this);
+
+        //World
+        Bukkit.getPluginManager().registerEvents(new FastBreakCheck(this), this);
+        Bukkit.getPluginManager().registerEvents(new FastPlaceCheck(this), this);
+
     }
 }
