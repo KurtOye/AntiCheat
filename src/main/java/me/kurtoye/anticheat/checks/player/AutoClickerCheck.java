@@ -68,7 +68,7 @@ public class AutoClickerCheck implements Listener {
 
         // 1) High CPS detection: If CPS exceeds the threshold, add suspicion points.
         if (currentCPS > maxCPS) {
-            int newSuspicion = SuspicionHandler.addSuspicionPoints(playerId, highCpsPoints, "AutoClickerCheck (HighCPS)");
+            int newSuspicion = SuspicionHandler.addSuspicionPoints(playerId, highCpsPoints, "AutoClickerCheck (HighCPS)", plugin);
             CheatReportHandler.handleSuspicionPunishment(player, plugin,
                     "AutoClicker Detected (CPS: " + currentCPS + ")", newSuspicion);
             clickCount.put(playerId, 0); // Reset count after flagging
@@ -83,8 +83,7 @@ public class AutoClickerCheck implements Listener {
             consistentClickViolations.put(playerId, newViolations);
 
             if (newViolations >= consistencyViolationThreshold) {
-                int newSuspicion = SuspicionHandler.addSuspicionPoints(playerId, perfectStabilityPoints,
-                        "AutoClickerCheck (Consistency)");
+                int newSuspicion = SuspicionHandler.addSuspicionPoints(playerId, perfectStabilityPoints, "AutoClickerCheck (Consistency)", plugin);
                 CheatReportHandler.handleSuspicionPunishment(player, plugin,
                         "AutoClicker Detected (Perfect CPS Stability: " + currentCPS + ")", newSuspicion);
                 consistentClickViolations.put(playerId, 0);

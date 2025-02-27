@@ -127,7 +127,7 @@ public class FastBreakCheck implements Listener {
             borderlineBreaks.computeIfAbsent(playerId, k -> new ArrayList<>()).add(currentTime);
             pruneOldBreaks(playerId, currentTime, 8000); // e.g., 8s window
 
-            int newSuspicion = SuspicionHandler.addSuspicionPoints(playerId, suspicionPoints, "FastBreak");
+            int newSuspicion = SuspicionHandler.addSuspicionPoints(playerId, suspicionPoints, "FastBreak", plugin);
             CheatReportHandler.handleSuspicionPunishment(player, plugin, "FastBreak Hack (Block: " + blockType + ")", newSuspicion);
 
             // (Optional) Data logging

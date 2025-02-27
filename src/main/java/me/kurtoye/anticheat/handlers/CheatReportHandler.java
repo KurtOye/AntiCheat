@@ -9,17 +9,24 @@ import java.util.UUID;
 
 public class CheatReportHandler {
 
-    // Staged thresholds – you can adjust these as needed.
-    private static final int STAGE1_THRESHOLD = 10;
-    private static final int STAGE2_THRESHOLD = 20;
-    private static final int STAGE3_THRESHOLD = 30;
-    private static final int EXTRA_SUSPICION_POINTS = 5;
-    private static final int CHEAT_LIFETIME_THRESHOLD = 100;
+    // Configurable key points – loaded from config.yml
+    private static int STAGE1_THRESHOLD;
+    private static int STAGE2_THRESHOLD;
+    private static int STAGE3_THRESHOLD;
+    private static int EXTRA_SUSPICION_POINTS;
+    private static int CHEAT_LIFETIME_THRESHOLD;
 
     /**
-     * Processes a suspicion event by checking lifetime suspicion for the given cheat type (reason)
-     * and then applying a punishment based on the updated suspicion level.
+     * Call this method during plugin initialization to load key values.
      */
+    public static void init(Anticheat plugin) {
+        STAGE1_THRESHOLD = plugin.getConfig().getInt("cheatreport.stage1_threshold", 10);
+        STAGE2_THRESHOLD = plugin.getConfig().getInt("cheatreport.stage2_threshold", 20);
+        STAGE3_THRESHOLD = plugin.getConfig().getInt("cheatreport.stage3_threshold", 30);
+        EXTRA_SUSPICION_POINTS = plugin.getConfig().getInt("cheatreport.extra_suspicion_points", 5);
+        CHEAT_LIFETIME_THRESHOLD = plugin.getConfig().getInt("cheatreport.cheat_lifetime_threshold", 100);
+    }
+
     public static void handleSuspicionPunishment(Player player, Anticheat plugin, String reason, int newSuspicion) {
         UUID playerId = player.getUniqueId();
         long currentTime = System.currentTimeMillis();
@@ -50,7 +57,7 @@ public class CheatReportHandler {
         } else if (newSuspicion >= STAGE1_THRESHOLD) {
             plugin.getLogger().info("Stage 1 reached: " + player.getName() + " warned for " + reason);
             maybeWarnPlayer(player, plugin, reason, currentTime);
-            // Do not reset lifetime suspicion here so that continued offenses will escalate.
+            // Do not reset lifetime suspicion so that continued offenses will escalate.
         }
     }
 

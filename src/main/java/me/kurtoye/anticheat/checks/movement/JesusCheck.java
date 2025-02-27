@@ -93,7 +93,7 @@ public class JesusCheck implements Listener {
             }
             // Flag if they consistently maintain jump velocity above water
             if (lastStoredY > -0.08 && verticalVelocity >= 0.08) {
-                int suspicion = SuspicionHandler.addSuspicionPoints(playerId, sprintJumpSuspicion, "JesusCheck (Sprint-Jump Exploit)");
+                int suspicion = SuspicionHandler.addSuspicionPoints(playerId, sprintJumpSuspicion, "JesusCheck (Sprint-Jump Exploit)", plugin);
                 CheatReportHandler.handleSuspicionPunishment(player, plugin, "Jesus Hack (Sprint-Jumping)", suspicion);
             }
             return;
@@ -125,7 +125,7 @@ public class JesusCheck implements Listener {
         // 9) If the player has been on water too long, suspect liquid-walk
         long startedWalking = waterWalkStartTime.get(playerId);
         if ((currentTime - startedWalking) > adjustedTimeThreshold) {
-            int suspicion = SuspicionHandler.addSuspicionPoints(playerId, liquidWalkSuspicion, "JesusCheck (Liquid Walking)");
+            int suspicion = SuspicionHandler.addSuspicionPoints(playerId, liquidWalkSuspicion, "JesusCheck (Liquid Walking)", plugin);
             CheatReportHandler.handleSuspicionPunishment(player, plugin, "Jesus Hack (Water-Walking)", suspicion);
         }
     }

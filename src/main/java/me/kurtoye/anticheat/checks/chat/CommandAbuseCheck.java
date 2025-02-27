@@ -39,12 +39,12 @@ public class CommandAbuseCheck implements Listener {
         FileConfiguration config = plugin.getConfig();
 
         // Basic config values
-        this.commandCooldown   = config.getLong("commandabuse.cooldown", 500);
-        this.maxCommandSpam    = config.getInt("commandabuse.max_repeats", 4);
+        this.commandCooldown = config.getLong("commandabuse.cooldown", 500);
+        this.maxCommandSpam = config.getInt("commandabuse.max_repeats", 4);
         this.restrictedCommands = config.getStringList("commandabuse.restricted_commands").toArray(new String[0]);
 
         // Suspicion increments
-        this.cooldownSuspicionPoints   = config.getInt("commandabuse.cooldown_suspicion_points", 2);
+        this.cooldownSuspicionPoints = config.getInt("commandabuse.cooldown_suspicion_points", 2);
         this.restrictedCmdSuspicionPoints = config.getInt("commandabuse.restricted_suspicion_points", 3);
     }
 
@@ -68,11 +68,7 @@ public class CommandAbuseCheck implements Listener {
             long timeSinceLastCommand = currentTime - lastCommandTime.get(playerId);
             if (timeSinceLastCommand < commandCooldown) {
                 // Suspicion increment instead of direct punishment
-                int suspicion = SuspicionHandler.addSuspicionPoints(
-                        playerId,
-                        cooldownSuspicionPoints,
-                        "CommandAbuse (Cooldown)"
-                );
+                int suspicion = SuspicionHandler.addSuspicionPoints(playerId, cooldownSuspicionPoints, "CommandAbuse (Cooldown)", plugin);
                 CheatReportHandler.handleSuspicionPunishment(player, plugin, "Command Abuse (Cooldown Violation)", suspicion);
 
                 // Cancel the event
@@ -95,28 +91,16 @@ public class CommandAbuseCheck implements Listener {
 
         if (count >= maxCommandSpam) {
             // Instead of direct punishment, add suspicion
-            int suspicion = SuspicionHandler.addSuspicionPoints(
-                    playerId,
-                    restrictedCmdSuspicionPoints,
-                    "CommandAbuse (Restricted Spam)"
-            );
+            int suspicion = SuspicionHandler.addSuspicionPoints(playerId, restrictedCmdSuspicionPoints, "CommandAbuse (Restricted Spam)", plugin);
             CheatReportHandler.handleSuspicionPunishment(player, plugin, "Command Abuse (Restricted Command Spam: " + command + ")", suspicion);
 
             // Cancel
             event.setCancelled(true);
             // Reset count
             commandCount.put(playerId, 0);
-        } else {
-            // If not yet at spam threshold, add suspicion anyway for restricted command
-            int suspicion = SuspicionHandler.addSuspicionPoints(
-                    playerId,
-                    restrictedCmdSuspicionPoints / 2,  // partial suspicion for first time usage
-                    "CommandAbuse (Restricted Command Partial)"
-            );
-            CheatReportHandler.handleSuspicionPunishment(player, plugin, "Partial Restricted Command Use: " + command, suspicion);
-        }
 
-        // Update last command time
-        lastCommandTime.put(playerId, currentTime);
+            // Update last command time
+            lastCommandTime.put(playerId, currentTime);
+        }
     }
 }

@@ -1,6 +1,7 @@
 package me.kurtoye.anticheat.handlers;
 
 import me.kurtoye.anticheat.Anticheat;
+import org.bukkit.configuration.file.FileConfiguration;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -10,13 +11,20 @@ public class SuspicionHandler {
 
     private static final Map<UUID, Integer> suspicionPoints = new HashMap<>();
     private static final Map<UUID, Long> lastSuspicionTime = new HashMap<>();
-    private static final int DEFAULT_THRESHOLD = 5;
-    private static final long DECAY_INTERVAL_MS = 5000; // 5 seconds
-    private static final int DECAY_AMOUNT = 1;
+    private static int DEFAULT_THRESHOLD;
+    private static long DECAY_INTERVAL_MS;
+    private static int DECAY_AMOUNT;
 
     /**
-     * Adds suspicion points for a player and also logs the event in the lifetime history for the specified cheat type.
+     * Call this method during plugin initialization to load decay settings.
      */
+    public static void init(Anticheat plugin) {
+        FileConfiguration config = plugin.getConfig();
+        DEFAULT_THRESHOLD = config.getInt("suspicion.default_threshold", 5);
+        DECAY_INTERVAL_MS = config.getLong("suspicion.decay_interval_ms", 5000);
+        DECAY_AMOUNT = config.getInt("suspicion.decay_amount", 1);
+    }
+
     public static int addSuspicionPoints(UUID playerId, int points, String reason, Anticheat plugin) {
         decaySuspicionIfNeeded(playerId);
         int oldValue = suspicionPoints.getOrDefault(playerId, 0);

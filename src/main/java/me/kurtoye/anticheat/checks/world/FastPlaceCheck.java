@@ -64,7 +64,7 @@ public class FastPlaceCheck implements Listener {
             pruneOldEvents(playerId, currentTime, 6000);
 
             // 3) If borderline event recurs, increment suspicion instead of immediate flag
-            int newSuspicion = SuspicionHandler.addSuspicionPoints(playerId, suspicionPoints, "FastPlace");
+            int newSuspicion = SuspicionHandler.addSuspicionPoints(playerId, suspicionPoints, "FastPlace", plugin);
             // 4) Let CheatReportUtil decide if punishment is triggered
             CheatReportHandler.handleSuspicionPunishment(player, plugin, "FastPlace", newSuspicion);
 

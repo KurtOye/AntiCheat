@@ -108,7 +108,7 @@ public class SpeedCheck implements Listener {
         // Core detection: if the speed is above threshold, increment suspicion
         if (speed > maxAllowedSpeed) {
             // Instead of local violation logic, increment suspicion points
-            int suspicion = SuspicionHandler.addSuspicionPoints(playerId, 3, "SpeedCheck");
+            int suspicion = SuspicionHandler.addSuspicionPoints(playerId, 3, "SpeedCheck", plugin);
             CheatReportHandler.handleSuspicionPunishment(player, plugin, "Speed Hack", suspicion);
         }
     }

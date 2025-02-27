@@ -38,10 +38,9 @@ public class Anticheat extends JavaPlugin {
         reloadConfig();
 
         this.teleportHandler = new TeleportHandler();
-
         this.historyHandler = new PlayerHistoryHandler(this);
-        registerChecks();
 
+        registerChecks();
         getLogger().info("✅ AntiCheat Plugin Enabled!");
     }
 
@@ -51,9 +50,9 @@ public class Anticheat extends JavaPlugin {
      */
     @Override
     public void onDisable() {
-        getLogger().info("❌ AntiCheat Plugin Disabled!");
 
         if (historyHandler != null) historyHandler.saveHistoryData();
+        getLogger().info("❌ AntiCheat Plugin Disabled!");
     }
 
     /**

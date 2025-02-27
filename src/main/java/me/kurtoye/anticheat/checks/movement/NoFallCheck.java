@@ -60,18 +60,10 @@ public class NoFallCheck implements Listener {
             if (actualFallDistance >= minFallDistance) {
                 // Add suspicion points
                 UUID playerId = player.getUniqueId();
-                int newSuspicion = SuspicionHandler.addSuspicionPoints(
-                        playerId,
-                        noFallSuspicionPoints,
-                        "NoFallCheck"
-                );
+                int newSuspicion = SuspicionHandler.addSuspicionPoints(playerId, noFallSuspicionPoints, "NoFallCheck", plugin);
 
                 // Now we handle or escalate punishment
-                CheatReportHandler.handleSuspicionPunishment(
-                        player,
-                        plugin,
-                        "No-Fall hack suspected",
-                        newSuspicion
+                CheatReportHandler.handleSuspicionPunishment(player, plugin, "No-Fall hack suspected", newSuspicion
                 );
 
                 // Optional debug log

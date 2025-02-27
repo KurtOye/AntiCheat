@@ -124,7 +124,7 @@ public class InventoryMoveCheck implements Listener {
         }
 
         // 9. Add suspicion, handle punishment
-        int suspicion = SuspicionHandler.addSuspicionPoints(playerId, suspicionPoints, "InventoryMove");
+        int suspicion = SuspicionHandler.addSuspicionPoints(playerId, suspicionPoints, "InventoryMove", plugin);
         CheatReportHandler.handleSuspicionPunishment(player, plugin, "Inventory Move Exploit", suspicion);
     }
 }

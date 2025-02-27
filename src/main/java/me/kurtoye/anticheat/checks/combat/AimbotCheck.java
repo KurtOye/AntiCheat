@@ -99,7 +99,7 @@ public class AimbotCheck implements Listener {
         // --------------------------------------
         if (totalAngleDiff > adjustedMaxSnapAngle) {
             // Snap angle suspicion
-            int suspicion = SuspicionHandler.addSuspicionPoints(playerId, suspicionSnapPoints, "Aimbot - SnapAngle");
+            int suspicion = SuspicionHandler.addSuspicionPoints(playerId, suspicionSnapPoints, "Aimbot - SnapAngle", plugin);
             CheatReportHandler.handleSuspicionPunishment(player, plugin, "AimBot SnapAngle", suspicion);
 
             // Reset any normal aim streak, because they did a big suspicious snap
@@ -117,7 +117,7 @@ public class AimbotCheck implements Listener {
 
                 // Enough consecutive tiny angle differences => suspicious "smooth" aimbot
                 if (oldCount >= consistentAngleCountThreshold) {
-                    int suspicion = SuspicionHandler.addSuspicionPoints(playerId, suspicionSmoothPoints, "Aimbot - SmoothAngle");
+                    int suspicion = SuspicionHandler.addSuspicionPoints(playerId, suspicionSmoothPoints, "Aimbot - SmoothAngle", plugin);
                     CheatReportHandler.handleSuspicionPunishment(player, plugin, "AimBot SmoothAngle", suspicion);
 
                     // Reset any normal aim streak

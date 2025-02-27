@@ -61,11 +61,7 @@ public class ChatSpamCheck implements Listener {
             long timeSinceLastMessage = currentTime - lastChatTime.get(playerId);
             if (timeSinceLastMessage < chatCooldown) {
                 // Instead of immediate punish, add suspicion
-                int suspicion = SuspicionHandler.addSuspicionPoints(
-                        playerId,
-                        chatCooldownSuspicionPoints,
-                        "ChatSpam (Cooldown Violation)"
-                );
+                int suspicion = SuspicionHandler.addSuspicionPoints(playerId, chatCooldownSuspicionPoints, "ChatSpam (Cooldown Violation)", plugin);
                 // Let the suspicion manager escalate if needed
                 CheatReportHandler.handleSuspicionPunishment(player, plugin, "Chat Spam (Cooldown)", suspicion);
 
@@ -82,11 +78,7 @@ public class ChatSpamCheck implements Listener {
 
             if (newCount >= maxSpamCount) {
                 // Instead of direct flagging, add suspicion
-                int suspicion = SuspicionHandler.addSuspicionPoints(
-                        playerId,
-                        repeatedMsgSuspicionPoints,
-                        "ChatSpam (Repeated Message)"
-                );
+                int suspicion = SuspicionHandler.addSuspicionPoints(playerId, repeatedMsgSuspicionPoints, "ChatSpam (Repeated Message)", plugin);
                 CheatReportHandler.handleSuspicionPunishment(player, plugin, "Chat Spam (Repeated)", suspicion);
 
                 // Cancel this chat event
