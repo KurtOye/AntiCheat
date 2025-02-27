@@ -1,4 +1,4 @@
-package me.kurtoye.anticheat.utilities;
+package me.kurtoye.anticheat.handlers;
 
 import me.kurtoye.anticheat.Anticheat;
 import org.bukkit.Bukkit;
@@ -16,7 +16,7 @@ import java.util.UUID;
  *  Stage 2: Kick
  *  Stage 3: Temporary ban
  */
-public class CheatReportUtil {
+public class CheatReportHandler {
 
     // Keep these if you still want chat/log cooldown for messages in chat/console
     private static final Map<UUID, Long> lastWarningTime = new HashMap<>();
@@ -51,7 +51,7 @@ public class CheatReportUtil {
             // Temp ban or perm ban logic
             Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "tempban " + player.getName() + " 30m " + reason);
             // Reset suspicion after punishment
-            SuspicionManager.resetPoints(playerId);
+            SuspicionHandler.resetPoints(playerId);
             return;
         } else if (newSuspicion >= STAGE2_THRESHOLD) {
             // Stage 2 => Kick
@@ -59,7 +59,7 @@ public class CheatReportUtil {
             player.sendMessage(ChatColor.RED + "[AntiCheat] " + reason + " detected! (Stage 2 => Kick)");
             Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "kick " + player.getName() + " " + reason + " - Stop cheating!");
             // Optionally keep suspicion or partially reset
-            SuspicionManager.resetPoints(playerId);
+            SuspicionHandler.resetPoints(playerId);
             return;
         } else if (newSuspicion >= STAGE1_THRESHOLD) {
             // Stage 1 => Warning

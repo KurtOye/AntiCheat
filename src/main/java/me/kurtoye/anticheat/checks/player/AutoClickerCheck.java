@@ -1,9 +1,9 @@
 package me.kurtoye.anticheat.checks.player;
 
 import me.kurtoye.anticheat.Anticheat;
-import me.kurtoye.anticheat.utilities.CheatReportUtil;
+import me.kurtoye.anticheat.handlers.CheatReportHandler;
 import me.kurtoye.anticheat.utilities.ClickUtil;
-import me.kurtoye.anticheat.utilities.SuspicionManager;
+import me.kurtoye.anticheat.handlers.SuspicionHandler;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -68,8 +68,8 @@ public class AutoClickerCheck implements Listener {
 
         // 1) High CPS detection: If CPS exceeds the threshold, add suspicion points.
         if (currentCPS > maxCPS) {
-            int newSuspicion = SuspicionManager.addSuspicionPoints(playerId, highCpsPoints, "AutoClickerCheck (HighCPS)");
-            CheatReportUtil.handleSuspicionPunishment(player, plugin,
+            int newSuspicion = SuspicionHandler.addSuspicionPoints(playerId, highCpsPoints, "AutoClickerCheck (HighCPS)");
+            CheatReportHandler.handleSuspicionPunishment(player, plugin,
                     "AutoClicker Detected (CPS: " + currentCPS + ")", newSuspicion);
             clickCount.put(playerId, 0); // Reset count after flagging
             plugin.getLogger().info("[DATA-LOG] " + player.getName() + " flagged for highCPS => " + currentCPS);
@@ -83,9 +83,9 @@ public class AutoClickerCheck implements Listener {
             consistentClickViolations.put(playerId, newViolations);
 
             if (newViolations >= consistencyViolationThreshold) {
-                int newSuspicion = SuspicionManager.addSuspicionPoints(playerId, perfectStabilityPoints,
+                int newSuspicion = SuspicionHandler.addSuspicionPoints(playerId, perfectStabilityPoints,
                         "AutoClickerCheck (Consistency)");
-                CheatReportUtil.handleSuspicionPunishment(player, plugin,
+                CheatReportHandler.handleSuspicionPunishment(player, plugin,
                         "AutoClicker Detected (Perfect CPS Stability: " + currentCPS + ")", newSuspicion);
                 consistentClickViolations.put(playerId, 0);
                 plugin.getLogger().info("[DATA-LOG] " + player.getName() + " flagged for perfect stable CPS => " + currentCPS);

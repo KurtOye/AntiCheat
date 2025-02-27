@@ -1,6 +1,8 @@
 package me.kurtoye.anticheat.checks.movement;
 
 import me.kurtoye.anticheat.Anticheat;
+import me.kurtoye.anticheat.handlers.CheatReportHandler;
+import me.kurtoye.anticheat.handlers.SuspicionHandler;
 import me.kurtoye.anticheat.utilities.*;
 import me.kurtoye.anticheat.handlers.TeleportHandler;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -8,7 +10,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerMoveEvent;
-import org.bukkit.event.entity.EntityDamageEvent;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -92,8 +93,8 @@ public class JesusCheck implements Listener {
             }
             // Flag if they consistently maintain jump velocity above water
             if (lastStoredY > -0.08 && verticalVelocity >= 0.08) {
-                int suspicion = SuspicionManager.addSuspicionPoints(playerId, sprintJumpSuspicion, "JesusCheck (Sprint-Jump Exploit)");
-                CheatReportUtil.handleSuspicionPunishment(player, plugin, "Jesus Hack (Sprint-Jumping)", suspicion);
+                int suspicion = SuspicionHandler.addSuspicionPoints(playerId, sprintJumpSuspicion, "JesusCheck (Sprint-Jump Exploit)");
+                CheatReportHandler.handleSuspicionPunishment(player, plugin, "Jesus Hack (Sprint-Jumping)", suspicion);
             }
             return;
         }
@@ -124,8 +125,8 @@ public class JesusCheck implements Listener {
         // 9) If the player has been on water too long, suspect liquid-walk
         long startedWalking = waterWalkStartTime.get(playerId);
         if ((currentTime - startedWalking) > adjustedTimeThreshold) {
-            int suspicion = SuspicionManager.addSuspicionPoints(playerId, liquidWalkSuspicion, "JesusCheck (Liquid Walking)");
-            CheatReportUtil.handleSuspicionPunishment(player, plugin, "Jesus Hack (Water-Walking)", suspicion);
+            int suspicion = SuspicionHandler.addSuspicionPoints(playerId, liquidWalkSuspicion, "JesusCheck (Liquid Walking)");
+            CheatReportHandler.handleSuspicionPunishment(player, plugin, "Jesus Hack (Water-Walking)", suspicion);
         }
     }
 

@@ -6,9 +6,9 @@
 package me.kurtoye.anticheat.checks.movement;
 
 import me.kurtoye.anticheat.Anticheat;
-import me.kurtoye.anticheat.utilities.CheatReportUtil;
+import me.kurtoye.anticheat.handlers.CheatReportHandler;
 import me.kurtoye.anticheat.utilities.MovementUtil;
-import me.kurtoye.anticheat.utilities.SuspicionManager;
+import me.kurtoye.anticheat.handlers.SuspicionHandler;
 import me.kurtoye.anticheat.utilities.WaterMovementUtil;
 import me.kurtoye.anticheat.handlers.TeleportHandler;
 import org.bukkit.GameMode;
@@ -25,7 +25,6 @@ import org.bukkit.inventory.InventoryView;
 import org.bukkit.util.Vector;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -125,7 +124,7 @@ public class InventoryMoveCheck implements Listener {
         }
 
         // 9. Add suspicion, handle punishment
-        int suspicion = SuspicionManager.addSuspicionPoints(playerId, suspicionPoints, "InventoryMove");
-        CheatReportUtil.handleSuspicionPunishment(player, plugin, "Inventory Move Exploit", suspicion);
+        int suspicion = SuspicionHandler.addSuspicionPoints(playerId, suspicionPoints, "InventoryMove");
+        CheatReportHandler.handleSuspicionPunishment(player, plugin, "Inventory Move Exploit", suspicion);
     }
 }

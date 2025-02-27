@@ -9,6 +9,7 @@ import me.kurtoye.anticheat.checks.movement.JesusCheck;
 import me.kurtoye.anticheat.checks.player.AutoClickerCheck;
 import me.kurtoye.anticheat.checks.world.FastBreakCheck;
 import me.kurtoye.anticheat.checks.world.FastPlaceCheck;
+import me.kurtoye.anticheat.handlers.PlayerHistoryHandler;
 import me.kurtoye.anticheat.handlers.TeleportHandler;
 import org.bukkit.Bukkit;
 import org.bukkit.inventory.Inventory;
@@ -23,6 +24,8 @@ import org.bukkit.plugin.java.JavaPlugin;
 public class Anticheat extends JavaPlugin {
 
     private TeleportHandler teleportHandler;
+    private PlayerHistoryHandler historyHandler;
+    private static Anticheat instance;
 
     /**
      * Called when the plugin is enabled.
@@ -35,6 +38,8 @@ public class Anticheat extends JavaPlugin {
         reloadConfig();
 
         this.teleportHandler = new TeleportHandler();
+
+        this.historyHandler = new PlayerHistoryHandler(this);
         registerChecks();
 
         getLogger().info("✅ AntiCheat Plugin Enabled!");
@@ -47,6 +52,8 @@ public class Anticheat extends JavaPlugin {
     @Override
     public void onDisable() {
         getLogger().info("❌ AntiCheat Plugin Disabled!");
+
+        if (historyHandler != null) historyHandler.saveHistoryData();
     }
 
     /**
@@ -76,4 +83,12 @@ public class Anticheat extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new FastPlaceCheck(this), this);
 
     }
+
+    public PlayerHistoryHandler getHistoryHandler(){
+        return historyHandler;
+    }
+    public static Anticheat getInstance(){
+        return instance;
+    }
+
 }

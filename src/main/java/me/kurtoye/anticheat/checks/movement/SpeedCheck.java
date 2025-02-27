@@ -2,6 +2,8 @@
 package me.kurtoye.anticheat.checks.movement;
 
 import me.kurtoye.anticheat.Anticheat;
+import me.kurtoye.anticheat.handlers.CheatReportHandler;
+import me.kurtoye.anticheat.handlers.SuspicionHandler;
 import me.kurtoye.anticheat.utilities.*;
 import me.kurtoye.anticheat.handlers.TeleportHandler;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -106,8 +108,8 @@ public class SpeedCheck implements Listener {
         // Core detection: if the speed is above threshold, increment suspicion
         if (speed > maxAllowedSpeed) {
             // Instead of local violation logic, increment suspicion points
-            int suspicion = SuspicionManager.addSuspicionPoints(playerId, 3, "SpeedCheck");
-            CheatReportUtil.handleSuspicionPunishment(player, plugin, "Speed Hack", suspicion);
+            int suspicion = SuspicionHandler.addSuspicionPoints(playerId, 3, "SpeedCheck");
+            CheatReportHandler.handleSuspicionPunishment(player, plugin, "Speed Hack", suspicion);
         }
     }
 

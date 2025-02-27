@@ -1,8 +1,8 @@
 package me.kurtoye.anticheat.checks.chat;
 
 import me.kurtoye.anticheat.Anticheat;
-import me.kurtoye.anticheat.utilities.CheatReportUtil;
-import me.kurtoye.anticheat.utilities.SuspicionManager;
+import me.kurtoye.anticheat.handlers.CheatReportHandler;
+import me.kurtoye.anticheat.handlers.SuspicionHandler;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -61,13 +61,13 @@ public class ChatSpamCheck implements Listener {
             long timeSinceLastMessage = currentTime - lastChatTime.get(playerId);
             if (timeSinceLastMessage < chatCooldown) {
                 // Instead of immediate punish, add suspicion
-                int suspicion = SuspicionManager.addSuspicionPoints(
+                int suspicion = SuspicionHandler.addSuspicionPoints(
                         playerId,
                         chatCooldownSuspicionPoints,
                         "ChatSpam (Cooldown Violation)"
                 );
                 // Let the suspicion manager escalate if needed
-                CheatReportUtil.handleSuspicionPunishment(player, plugin, "Chat Spam (Cooldown)", suspicion);
+                CheatReportHandler.handleSuspicionPunishment(player, plugin, "Chat Spam (Cooldown)", suspicion);
 
                 // Cancel the chat event
                 event.setCancelled(true);
@@ -82,12 +82,12 @@ public class ChatSpamCheck implements Listener {
 
             if (newCount >= maxSpamCount) {
                 // Instead of direct flagging, add suspicion
-                int suspicion = SuspicionManager.addSuspicionPoints(
+                int suspicion = SuspicionHandler.addSuspicionPoints(
                         playerId,
                         repeatedMsgSuspicionPoints,
                         "ChatSpam (Repeated Message)"
                 );
-                CheatReportUtil.handleSuspicionPunishment(player, plugin, "Chat Spam (Repeated)", suspicion);
+                CheatReportHandler.handleSuspicionPunishment(player, plugin, "Chat Spam (Repeated)", suspicion);
 
                 // Cancel this chat event
                 event.setCancelled(true);

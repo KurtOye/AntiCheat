@@ -1,11 +1,11 @@
 package me.kurtoye.anticheat.checks.world;
 
 import me.kurtoye.anticheat.Anticheat;
-import me.kurtoye.anticheat.utilities.CheatReportUtil;
+import me.kurtoye.anticheat.handlers.CheatReportHandler;
 import me.kurtoye.anticheat.utilities.PingUtil;
 import me.kurtoye.anticheat.utilities.TpsUtil;
 import me.kurtoye.anticheat.utilities.WaterMovementUtil;
-import me.kurtoye.anticheat.utilities.SuspicionManager;
+import me.kurtoye.anticheat.handlers.SuspicionHandler;
 import org.bukkit.GameMode;
 import org.bukkit.Material;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -127,8 +127,8 @@ public class FastBreakCheck implements Listener {
             borderlineBreaks.computeIfAbsent(playerId, k -> new ArrayList<>()).add(currentTime);
             pruneOldBreaks(playerId, currentTime, 8000); // e.g., 8s window
 
-            int newSuspicion = SuspicionManager.addSuspicionPoints(playerId, suspicionPoints, "FastBreak");
-            CheatReportUtil.handleSuspicionPunishment(player, plugin, "FastBreak Hack (Block: " + blockType + ")", newSuspicion);
+            int newSuspicion = SuspicionHandler.addSuspicionPoints(playerId, suspicionPoints, "FastBreak");
+            CheatReportHandler.handleSuspicionPunishment(player, plugin, "FastBreak Hack (Block: " + blockType + ")", newSuspicion);
 
             // (Optional) Data logging
             plugin.getLogger().info("[DATA-LOG] " + player.getName() + " borderline fast break on " + blockType + " at " + currentTime);

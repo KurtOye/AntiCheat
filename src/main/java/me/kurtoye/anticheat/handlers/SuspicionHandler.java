@@ -1,10 +1,15 @@
-package me.kurtoye.anticheat.utilities;
+package me.kurtoye.anticheat.handlers;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-public class SuspicionManager {
+import me.kurtoye.anticheat.Anticheat;
+import me.kurtoye.anticheat.handlers.PlayerHistoryHandler;
+import org.bukkit.plugin.java.JavaPlugin;
+
+public class SuspicionHandler {
+
 
     // Stores each player's suspicion score
     private static final Map<UUID, Integer> suspicionPoints = new HashMap<>();
@@ -32,6 +37,9 @@ public class SuspicionManager {
         suspicionPoints.put(playerId, newValue);
 
         lastSuspicionTime.put(playerId, System.currentTimeMillis());
+
+        Anticheat instance = Anticheat.getInstance();
+        instance.getHistoryHandler().addLifetimeSuspicion(playerId, points);
 
         return newValue;
     }
@@ -84,4 +92,5 @@ public class SuspicionManager {
             lastSuspicionTime.put(playerId, now);
         }
     }
+
 }

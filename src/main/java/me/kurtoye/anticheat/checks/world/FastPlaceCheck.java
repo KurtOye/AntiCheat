@@ -1,10 +1,10 @@
 package me.kurtoye.anticheat.checks.world;
 
 import me.kurtoye.anticheat.Anticheat;
-import me.kurtoye.anticheat.utilities.CheatReportUtil;
+import me.kurtoye.anticheat.handlers.CheatReportHandler;
 import me.kurtoye.anticheat.utilities.PingUtil;
 import me.kurtoye.anticheat.utilities.TpsUtil;
-import me.kurtoye.anticheat.utilities.SuspicionManager;
+import me.kurtoye.anticheat.handlers.SuspicionHandler;
 import org.bukkit.GameMode;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
@@ -64,9 +64,9 @@ public class FastPlaceCheck implements Listener {
             pruneOldEvents(playerId, currentTime, 6000);
 
             // 3) If borderline event recurs, increment suspicion instead of immediate flag
-            int newSuspicion = SuspicionManager.addSuspicionPoints(playerId, suspicionPoints, "FastPlace");
+            int newSuspicion = SuspicionHandler.addSuspicionPoints(playerId, suspicionPoints, "FastPlace");
             // 4) Let CheatReportUtil decide if punishment is triggered
-            CheatReportUtil.handleSuspicionPunishment(player, plugin, "FastPlace", newSuspicion);
+            CheatReportHandler.handleSuspicionPunishment(player, plugin, "FastPlace", newSuspicion);
 
             // (Optional) Log data for offline analysis:
             plugin.getLogger().info("[DATA-LOG] " + player.getName() + " borderline fast place at " + currentTime);

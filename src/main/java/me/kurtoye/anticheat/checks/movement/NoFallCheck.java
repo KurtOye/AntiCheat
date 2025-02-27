@@ -1,8 +1,8 @@
 package me.kurtoye.anticheat.checks.movement;
 
 import me.kurtoye.anticheat.Anticheat;
-import me.kurtoye.anticheat.utilities.CheatReportUtil;
-import me.kurtoye.anticheat.utilities.SuspicionManager;
+import me.kurtoye.anticheat.handlers.CheatReportHandler;
+import me.kurtoye.anticheat.handlers.SuspicionHandler;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -60,14 +60,14 @@ public class NoFallCheck implements Listener {
             if (actualFallDistance >= minFallDistance) {
                 // Add suspicion points
                 UUID playerId = player.getUniqueId();
-                int newSuspicion = SuspicionManager.addSuspicionPoints(
+                int newSuspicion = SuspicionHandler.addSuspicionPoints(
                         playerId,
                         noFallSuspicionPoints,
                         "NoFallCheck"
                 );
 
                 // Now we handle or escalate punishment
-                CheatReportUtil.handleSuspicionPunishment(
+                CheatReportHandler.handleSuspicionPunishment(
                         player,
                         plugin,
                         "No-Fall hack suspected",

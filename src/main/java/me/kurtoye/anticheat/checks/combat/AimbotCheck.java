@@ -1,10 +1,10 @@
 package me.kurtoye.anticheat.checks.combat;
 
 import me.kurtoye.anticheat.Anticheat;
-import me.kurtoye.anticheat.utilities.CheatReportUtil;
+import me.kurtoye.anticheat.handlers.CheatReportHandler;
 import me.kurtoye.anticheat.utilities.PingUtil;
 import me.kurtoye.anticheat.utilities.TpsUtil;
-import me.kurtoye.anticheat.utilities.SuspicionManager;
+import me.kurtoye.anticheat.handlers.SuspicionHandler;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -99,8 +99,8 @@ public class AimbotCheck implements Listener {
         // --------------------------------------
         if (totalAngleDiff > adjustedMaxSnapAngle) {
             // Snap angle suspicion
-            int suspicion = SuspicionManager.addSuspicionPoints(playerId, suspicionSnapPoints, "Aimbot - SnapAngle");
-            CheatReportUtil.handleSuspicionPunishment(player, plugin, "AimBot SnapAngle", suspicion);
+            int suspicion = SuspicionHandler.addSuspicionPoints(playerId, suspicionSnapPoints, "Aimbot - SnapAngle");
+            CheatReportHandler.handleSuspicionPunishment(player, plugin, "AimBot SnapAngle", suspicion);
 
             // Reset any normal aim streak, because they did a big suspicious snap
             normalAimStreak.put(playerId, 0);
@@ -117,8 +117,8 @@ public class AimbotCheck implements Listener {
 
                 // Enough consecutive tiny angle differences => suspicious "smooth" aimbot
                 if (oldCount >= consistentAngleCountThreshold) {
-                    int suspicion = SuspicionManager.addSuspicionPoints(playerId, suspicionSmoothPoints, "Aimbot - SmoothAngle");
-                    CheatReportUtil.handleSuspicionPunishment(player, plugin, "AimBot SmoothAngle", suspicion);
+                    int suspicion = SuspicionHandler.addSuspicionPoints(playerId, suspicionSmoothPoints, "Aimbot - SmoothAngle");
+                    CheatReportHandler.handleSuspicionPunishment(player, plugin, "AimBot SmoothAngle", suspicion);
 
                     // Reset any normal aim streak
                     normalAimStreak.put(playerId, 0);

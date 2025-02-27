@@ -1,8 +1,8 @@
 package me.kurtoye.anticheat.checks.chat;
 
 import me.kurtoye.anticheat.Anticheat;
-import me.kurtoye.anticheat.utilities.CheatReportUtil;
-import me.kurtoye.anticheat.utilities.SuspicionManager;
+import me.kurtoye.anticheat.handlers.CheatReportHandler;
+import me.kurtoye.anticheat.handlers.SuspicionHandler;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -68,12 +68,12 @@ public class CommandAbuseCheck implements Listener {
             long timeSinceLastCommand = currentTime - lastCommandTime.get(playerId);
             if (timeSinceLastCommand < commandCooldown) {
                 // Suspicion increment instead of direct punishment
-                int suspicion = SuspicionManager.addSuspicionPoints(
+                int suspicion = SuspicionHandler.addSuspicionPoints(
                         playerId,
                         cooldownSuspicionPoints,
                         "CommandAbuse (Cooldown)"
                 );
-                CheatReportUtil.handleSuspicionPunishment(player, plugin, "Command Abuse (Cooldown Violation)", suspicion);
+                CheatReportHandler.handleSuspicionPunishment(player, plugin, "Command Abuse (Cooldown Violation)", suspicion);
 
                 // Cancel the event
                 event.setCancelled(true);
@@ -95,12 +95,12 @@ public class CommandAbuseCheck implements Listener {
 
         if (count >= maxCommandSpam) {
             // Instead of direct punishment, add suspicion
-            int suspicion = SuspicionManager.addSuspicionPoints(
+            int suspicion = SuspicionHandler.addSuspicionPoints(
                     playerId,
                     restrictedCmdSuspicionPoints,
                     "CommandAbuse (Restricted Spam)"
             );
-            CheatReportUtil.handleSuspicionPunishment(player, plugin, "Command Abuse (Restricted Command Spam: " + command + ")", suspicion);
+            CheatReportHandler.handleSuspicionPunishment(player, plugin, "Command Abuse (Restricted Command Spam: " + command + ")", suspicion);
 
             // Cancel
             event.setCancelled(true);
@@ -108,12 +108,12 @@ public class CommandAbuseCheck implements Listener {
             commandCount.put(playerId, 0);
         } else {
             // If not yet at spam threshold, add suspicion anyway for restricted command
-            int suspicion = SuspicionManager.addSuspicionPoints(
+            int suspicion = SuspicionHandler.addSuspicionPoints(
                     playerId,
                     restrictedCmdSuspicionPoints / 2,  // partial suspicion for first time usage
                     "CommandAbuse (Restricted Command Partial)"
             );
-            CheatReportUtil.handleSuspicionPunishment(player, plugin, "Partial Restricted Command Use: " + command, suspicion);
+            CheatReportHandler.handleSuspicionPunishment(player, plugin, "Partial Restricted Command Use: " + command, suspicion);
         }
 
         // Update last command time
