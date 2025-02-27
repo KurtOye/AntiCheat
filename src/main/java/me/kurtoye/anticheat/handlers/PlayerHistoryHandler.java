@@ -7,12 +7,12 @@ import org.bukkit.scheduler.BukkitRunnable;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 /**
- * PlayerHistoryManager handles saving/loading long-term suspicion data to a file.
+ * Handles the persistent tracking of lifetime suspicion events on a per-cheat basis.
+ * Each event counts at full value for 30 days (one month) and then decays linearly
+ * over the next month. Events older than 60 days contribute 0.
  */
 public class PlayerHistoryHandler {
 
@@ -20,9 +20,11 @@ public class PlayerHistoryHandler {
     private File historyFile;
     private FileConfiguration historyConfig;
 
-    // We store lifetime or “rolling” suspicion totals here
-    private final Map<UUID, Integer> totalLifetimeSuspicion = new HashMap<>();
-    // Could also store daily or weekly suspicion. Up to you.
+    // Map: player UUID -> (cheat type -> list of suspicion events)
+    private Map<UUID, Map<String, List<SuspicionEvent>>> history = new HashMap<>();
+
+    private final long ONE_MONTH_MS = 30L * 24 * 60 * 60 * 1000; // 30 days
+    private final long TWO_MONTHS_MS = 2 * ONE_MONTH_MS;         // 60 days
 
     public PlayerHistoryHandler(Anticheat plugin) {
         this.plugin = plugin;
@@ -32,36 +34,77 @@ public class PlayerHistoryHandler {
     }
 
     /**
-     * Increments the player’s lifetime suspicion in memory.
+     * Adds a new suspicion event for a specific cheat type.
      */
-    public void addLifetimeSuspicion(UUID playerId, int points) {
-        int oldValue = totalLifetimeSuspicion.getOrDefault(playerId, 0);
-        totalLifetimeSuspicion.put(playerId, oldValue + points);
+    public void addLifetimeSuspicionForCheat(UUID playerId, String cheatType, int points) {
+        Map<String, List<SuspicionEvent>> playerHistory = history.getOrDefault(playerId, new HashMap<>());
+        List<SuspicionEvent> events = playerHistory.getOrDefault(cheatType, new ArrayList<>());
+        events.add(new SuspicionEvent(points, System.currentTimeMillis()));
+        playerHistory.put(cheatType, events);
+        history.put(playerId, playerHistory);
     }
 
     /**
-     * Retrieves the total suspicion recorded for a player.
+     * Calculates the lifetime suspicion for a given cheat type.
+     * Full points count for events < 1 month old.
+     * For events between 1 and 2 months, the contribution decays linearly.
+     * Events older than 2 months are ignored.
      */
-    public int getLifetimeSuspicion(UUID playerId) {
-        return totalLifetimeSuspicion.getOrDefault(playerId, 0);
-    }
-
-    /**
-     * Saves the data to the file (called periodically or onDisable).
-     */
-    public void saveHistoryData() {
-        try {
-            for (Map.Entry<UUID, Integer> entry : totalLifetimeSuspicion.entrySet()) {
-                historyConfig.set("players." + entry.getKey() + ".lifetimeSuspicion", entry.getValue());
+    public int getLifetimeSuspicionForCheat(UUID playerId, String cheatType) {
+        int total = 0;
+        long now = System.currentTimeMillis();
+        Map<String, List<SuspicionEvent>> playerHistory = history.get(playerId);
+        if (playerHistory == null) return 0;
+        List<SuspicionEvent> events = playerHistory.get(cheatType);
+        if (events == null) return 0;
+        for (SuspicionEvent event : events) {
+            long age = now - event.getTimestamp();
+            if (age <= ONE_MONTH_MS) {
+                total += event.getPoints();
+            } else if (age < TWO_MONTHS_MS) {
+                double decayFactor = 1.0 - ((double)(age - ONE_MONTH_MS) / ONE_MONTH_MS);
+                total += (int)(event.getPoints() * decayFactor);
             }
-            historyConfig.save(historyFile);
-        } catch (IOException e) {
-            plugin.getLogger().severe("Could not save AntiCheat history data!");
-            e.printStackTrace();
+            // Events older than two months contribute nothing.
+        }
+        return total;
+    }
+
+    /**
+     * Resets the lifetime suspicion events for a given cheat type.
+     */
+    public void resetLifetimeSuspicionForCheat(UUID playerId, String cheatType) {
+        Map<String, List<SuspicionEvent>> playerHistory = history.get(playerId);
+        if (playerHistory != null) {
+            playerHistory.put(cheatType, new ArrayList<>());
         }
     }
 
-    // ------------------ Private Helpers ------------------ //
+    /**
+     * Saves all history data to a YAML file.
+     */
+    public void saveHistoryData() {
+        try {
+            for (Map.Entry<UUID, Map<String, List<SuspicionEvent>>> playerEntry : history.entrySet()) {
+                String uuidStr = playerEntry.getKey().toString();
+                for (Map.Entry<String, List<SuspicionEvent>> cheatEntry : playerEntry.getValue().entrySet()) {
+                    String path = "players." + uuidStr + "." + cheatEntry.getKey();
+                    List<Map<String, Object>> eventList = new ArrayList<>();
+                    for (SuspicionEvent event : cheatEntry.getValue()) {
+                        Map<String, Object> eventData = new HashMap<>();
+                        eventData.put("points", event.getPoints());
+                        eventData.put("timestamp", event.getTimestamp());
+                        eventList.add(eventData);
+                    }
+                    historyConfig.set(path, eventList);
+                }
+            }
+            historyConfig.save(historyFile);
+        } catch (IOException e) {
+            plugin.getLogger().severe("Could not save player history data!");
+            e.printStackTrace();
+        }
+    }
 
     private void createHistoryFile() {
         historyFile = new File(plugin.getDataFolder(), "player_history.yml");
@@ -80,15 +123,29 @@ public class PlayerHistoryHandler {
     private void loadHistoryData() {
         if (historyConfig.contains("players")) {
             for (String uuidStr : historyConfig.getConfigurationSection("players").getKeys(false)) {
-                UUID uuid = UUID.fromString(uuidStr);
-                int suspicion = historyConfig.getInt("players." + uuidStr + ".lifetimeSuspicion", 0);
-                totalLifetimeSuspicion.put(uuid, suspicion);
+                UUID playerId = UUID.fromString(uuidStr);
+                Map<String, List<SuspicionEvent>> cheatMap = new HashMap<>();
+                for (String cheatType : historyConfig.getConfigurationSection("players." + uuidStr).getKeys(false)) {
+                    List<?> eventList = historyConfig.getList("players." + uuidStr + "." + cheatType);
+                    List<SuspicionEvent> events = new ArrayList<>();
+                    if (eventList != null) {
+                        for (Object obj : eventList) {
+                            if (obj instanceof Map) {
+                                Map<?, ?> eventData = (Map<?, ?>) obj;
+                                int points = (int) eventData.get("points");
+                                long timestamp = ((Number) eventData.get("timestamp")).longValue();
+                                events.add(new SuspicionEvent(points, timestamp));
+                            }
+                        }
+                    }
+                    cheatMap.put(cheatType, events);
+                }
+                history.put(playerId, cheatMap);
             }
         }
     }
 
     private void startAutoSaveTask() {
-        // Saves every 5 minutes
         new BukkitRunnable() {
             @Override
             public void run() {
