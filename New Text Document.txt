@@ -1,0 +1,1 @@
+Refined the Chat Checks with Yaml and what not on GPT

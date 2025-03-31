@@ -1,0 +1,61 @@
+# 🚀 Anti-Cheat Configuration File
+# ✅ Modify detection thresholds without changing the source code
+
+# ⚡ SpeedCheck Settings
+speedcheck:
+  max_violations: 3           # Number of violations before flagging
+  violation_reset_time: 10000 # Time (ms) before violations reset
+  violation_leeway: 1.10      # Allowance to prevent false positives
+
+# 🌊 JesusCheck (Water-Walking) Settings
+jesuscheck:
+  min_water_walk_time: 2500   # Time (ms) before flagging
+  max_allowed_acceleration: 3.5 # Max allowed acceleration before flagging
+  min_bounce_velocity: -0.12  # Minimum velocity to ignore bouncing
+  max_bounce_velocity: 0.12   # Maximum velocity to ignore bouncing
+  max_sprint_jump_velocity: 0.42 # Max sprint jump Y velocity
+
+# 🚀 FlyCheck Settings
+flycheck:
+  max_air_time: 3000          # Time (ms) before flagging for flying
+  velocity_tolerance: 0.1     # Tolerance for natural falling
+
+# 🔨 FastBreakCheck Settings
+fastbreak:
+  min_break_time: 30         # Minimum time (ms) between block breaks
+
+# 🧱 FastPlaceCheck Settings
+fastplace:
+  min_place_time: 200         # Minimum time (ms) between block placements
+
+# 🎯 AutoClickerCheck Settings
+autoclicker:
+  max_cps: 20                 # Max allowed clicks per second
+  perfect_cps_threshold: 3     # Number of times a player can maintain exact CPS before flagging
+
+# 🗣️ ChatSpamCheck Settings
+chatspam:
+  cooldown: 2000              # Time (ms) between messages
+  max_repeats: 3              # Max repeated messages before flagging
+
+# 📝 CommandAbuseCheck Settings
+commandabuse:
+  cooldown: 1000             # Time (ms) between commands
+  max_repeats: 4              # Max repeated commands before flagging
+  restricted_commands:
+    - "/tpa"
+    - "/home"
+    - "/spawn"
+    - "/warp"
+    - "/msg"
+    - "/helpop"
+
+# ⚡ Performance & Lag Compensation
+performance:
+  ping_threshold: 300         # Ping value above which leniency is applied
+  tps_threshold: 18.0         # TPS below which leniency is applied
+
+# ✅ Logging & Debugging
+logging:
+  enable_debug: false         # Enable detailed logs for testing
+  log_violations: true        # Log flagged players
