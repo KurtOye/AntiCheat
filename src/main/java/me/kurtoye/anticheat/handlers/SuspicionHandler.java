@@ -31,10 +31,9 @@ public class SuspicionHandler {
         int newValue = oldValue + points;
         suspicionPoints.put(playerId, newValue);
         lastSuspicionTime.put(playerId, System.currentTimeMillis());
-
         // Record this suspicion event in the lifetime history.
         plugin.getHistoryHandler().addLifetimeSuspicionForCheat(playerId, reason, points);
-
+        CheatReportHandler.handleSuspicionPunishment(player, plugin, reason, points);
         return newValue;
     }
 

@@ -1,4 +1,4 @@
-package me.kurtoye.anticheat.checks.player;
+package me.kurtoye.anticheat.checks.combat;
 
 import me.kurtoye.anticheat.Anticheat;
 import me.kurtoye.anticheat.handlers.CheatReportHandler;

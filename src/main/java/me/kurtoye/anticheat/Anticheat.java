@@ -6,13 +6,12 @@ import me.kurtoye.anticheat.checks.movement.InventoryMoveCheck;
 import me.kurtoye.anticheat.checks.movement.NoFallCheck;
 import me.kurtoye.anticheat.checks.movement.SpeedCheck;
 import me.kurtoye.anticheat.checks.movement.JesusCheck;
-import me.kurtoye.anticheat.checks.player.AutoClickerCheck;
+import me.kurtoye.anticheat.checks.combat.AutoClickerCheck;
 import me.kurtoye.anticheat.checks.world.FastBreakCheck;
 import me.kurtoye.anticheat.checks.world.FastPlaceCheck;
 import me.kurtoye.anticheat.handlers.PlayerHistoryHandler;
 import me.kurtoye.anticheat.handlers.TeleportHandler;
 import org.bukkit.Bukkit;
-import org.bukkit.inventory.Inventory;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /**

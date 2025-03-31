@@ -43,6 +43,7 @@ public class SpeedCheck implements Listener {
     private final Anticheat plugin;
     private final double violationLeeway;
 
+
     public SpeedCheck(Anticheat plugin, TeleportHandler teleportHandler) {
         this.plugin = plugin;
         this.teleportHandler = teleportHandler;
