@@ -1,97 +1,124 @@
 package me.kurtoye.anticheat.checks.combat;
 
-import me.kurtoye.anticheat.Anticheat;
-import me.kurtoye.anticheat.handlers.CheatReportHandler;
-import me.kurtoye.anticheat.utilities.ClickUtil;
-import me.kurtoye.anticheat.handlers.SuspicionHandler;
+import org.bukkit.GameMode;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+
+import me.kurtoye.anticheat.Anticheat;
+import me.kurtoye.anticheat.handlers.CheatReportHandler;
+import me.kurtoye.anticheat.handlers.SuspicionHandler;
+import me.kurtoye.anticheat.handlers.TeleportHandler;
+import me.kurtoye.anticheat.utilities.ClickUtil;
+import me.kurtoye.anticheat.utilities.MovementUtil;
+import me.kurtoye.anticheat.utilities.PingUtil;
+import me.kurtoye.anticheat.utilities.TpsUtil;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * Enhanced AutoClickerCheck:
+ * - Tracks clicks per interval, flags high CPS and perfect stability.
+ * - Applies ping/TPS compensation to CPS thresholds.
+ * - Skips after teleport/knockback, non-survival, and bypass permission.
+ * - Uses progressive suspicion scoring and debug logs for tuning.
+ */
 public class AutoClickerCheck implements Listener {
-    private final Map<UUID, Long> lastClickTime = new HashMap<>();
-    private final Map<UUID, Integer> clickCount  = new HashMap<>();
-    private final Map<UUID, Integer> consistentClickViolations = new HashMap<>();
     private final Anticheat plugin;
-    private final int maxCPS;
-    private final int maxConsistentCPS;
+    private final TeleportHandler teleportHandler;
+
+    // Click tracking and violation counters
+    private final Map<UUID, Integer> clickCounts = new HashMap<>();
+    private final Map<UUID, Integer> consistencyViolations = new HashMap<>();
+    private final Map<UUID, Long> lastVelocityChangeTime = new HashMap<>();
+    private final Map<UUID, Long> lastTeleportTime = new HashMap<>();
+
+    // Config parameters
+    private final boolean enabled;
+    private final long resetIntervalMs;
+    private final int maxCPSThreshold;
+    private final int consistencyCPSLimit;
     private final int consistencyViolationThreshold;
-    private final long violationResetTime;
+    private final int highCpsSuspicion;
+    private final int consistencySuspicion;
 
-    // Suspicion points to add for each violation scenario
-    private final int highCpsPoints;         // Points for exceeding maxCPS
-    private final int perfectStabilityPoints; // Points for sustained perfect CPS
-
-    public AutoClickerCheck(Anticheat plugin) {
+    public AutoClickerCheck(Anticheat plugin, TeleportHandler teleportHandler) {
         this.plugin = plugin;
-        FileConfiguration config = plugin.getConfig();
-        this.maxCPS = config.getInt("autoclicker.max_cps", 20);
-        this.maxConsistentCPS = config.getInt("autoclicker.max_consistent_cps", 12);
-        this.consistencyViolationThreshold = config.getInt("autoclicker.consistency_violation_threshold", 5);
-        this.violationResetTime = config.getLong("autoclicker.violation_reset_time", 10000);
-
-        this.highCpsPoints = config.getInt("autoclicker.points_highCPS", 3);
-        this.perfectStabilityPoints = config.getInt("autoclicker.points_perfectStability", 2);
+        this.teleportHandler = teleportHandler;
+        FileConfiguration cfg = plugin.getConfig();
+        this.enabled = cfg.getBoolean("autoclicker.enabled", true);
+        this.resetIntervalMs = cfg.getLong("autoclicker.reset_interval_ms", 1000);
+        this.maxCPSThreshold = cfg.getInt("autoclicker.max_cps_threshold", 20);
+        this.consistencyCPSLimit = cfg.getInt("autoclicker.consistency_cps_limit", 15);
+        this.consistencyViolationThreshold = cfg.getInt("autoclicker.consistency_violations", 5);
+        this.highCpsSuspicion = cfg.getInt("autoclicker.high_cps_suspicion_points", 3);
+        this.consistencySuspicion = cfg.getInt("autoclicker.consistency_suspicion_points", 4);
     }
 
     @EventHandler
-    public void onPlayerClick(PlayerInteractEvent event) {
-        // If the player is left-clicking a block (i.e., breaking blocks), skip auto-click detection.
-        if (event.getAction() == Action.LEFT_CLICK_BLOCK) {
+    public void onPlayerInteract(PlayerInteractEvent ev) {
+        if (!enabled) return;
+        if (!(ev.getAction() == Action.LEFT_CLICK_AIR || ev.getAction() == Action.LEFT_CLICK_BLOCK)) return;
+
+        Player player = ev.getPlayer();
+        UUID id = player.getUniqueId();
+
+        // Skip non-survival, bypass, teleport/knockback
+        if (player.getGameMode() != GameMode.SURVIVAL) return;
+        if (player.hasPermission("anticheat.bypass")) return;
+        if (MovementUtil.shouldIgnoreMovement(player, teleportHandler, lastVelocityChangeTime, lastTeleportTime)) {
+            clickCounts.remove(id);
+            consistencyViolations.remove(id);
             return;
         }
 
-        Player player = event.getPlayer();
-        UUID playerId = player.getUniqueId();
-        long currentTime = System.currentTimeMillis();
+        // Increment raw click count
+        clickCounts.put(id, clickCounts.getOrDefault(id, 0) + 1);
 
-        long lastClick = lastClickTime.getOrDefault(playerId, currentTime);
-        long timeSinceLastClick = currentTime - lastClick;
-        // Ignore clicks that are faster than physically possible (less than 50ms apart)
-        if (timeSinceLastClick < 50) return;
+        // Calculate CPS with reset mechanism
+        int currentCPS = ClickUtil.calculateCPS(id, clickCounts, resetIntervalMs);
 
-        lastClickTime.put(playerId, currentTime);
+        // Adjust thresholds by ping/TPS
+        double pingFactor = PingUtil.getPingCompensationFactor(player);
+        double tpsFactor  = TpsUtil.getTpsCompensationFactor();
 
-        // Increase the player's click count.
-        int updatedClickCount = clickCount.getOrDefault(playerId, 0) + 1;
-        clickCount.put(playerId, updatedClickCount);
+        int adjustedMaxCPS = (int) Math.ceil(maxCPSThreshold * pingFactor * tpsFactor);
+        int adjustedConsistencyLimit = (int) Math.ceil(consistencyCPSLimit * pingFactor * tpsFactor);
 
-        // Calculate current CPS using ClickUtil's helper (which resets count after violationResetTime).
-        int currentCPS = ClickUtil.calculateCPS(playerId, clickCount, violationResetTime);
-
-        // 1) High CPS detection: If CPS exceeds the threshold, add suspicion points.
-        if (currentCPS > maxCPS) {
-            int newSuspicion = SuspicionHandler.addSuspicionPoints(playerId, highCpsPoints, "AutoClickerCheck (HighCPS)", plugin);
+        // Flag high CPS spikes
+        if (currentCPS > adjustedMaxCPS) {
+            int sus = SuspicionHandler.addSuspicionPoints(id, highCpsSuspicion, "AutoClickerCheck(HighCPS)", plugin);
             CheatReportHandler.handleSuspicionPunishment(player, plugin,
-                    "AutoClicker Detected (CPS: " + currentCPS + ")", newSuspicion);
-            clickCount.put(playerId, 0); // Reset count after flagging
-            plugin.getLogger().info("[DATA-LOG] " + player.getName() + " flagged for highCPS => " + currentCPS);
-            return;
+                    String.format("AutoClicker: CPS %d > %d", currentCPS, adjustedMaxCPS), sus);
+            plugin.getLogger().fine(String.format(
+                    "[AutoClickerCheck] %s CPS=%d > max=%d", player.getName(), currentCPS, adjustedMaxCPS));
         }
 
-        // 2) Consistent CPS detection: Check if CPS remains exactly stable over multiple intervals.
-        if (ClickUtil.isConsistentlySameCPS(playerId, currentCPS, maxConsistentCPS)) {
-            int oldViolations = consistentClickViolations.getOrDefault(playerId, 0);
-            int newViolations = oldViolations + 1;
-            consistentClickViolations.put(playerId, newViolations);
-
-            if (newViolations >= consistencyViolationThreshold) {
-                int newSuspicion = SuspicionHandler.addSuspicionPoints(playerId, perfectStabilityPoints, "AutoClickerCheck (Consistency)", plugin);
+        // Flag perfectly consistent CPS
+        if (ClickUtil.isConsistentlySameCPS(id, currentCPS, adjustedConsistencyLimit)) {
+            int violations = consistencyViolations.getOrDefault(id, 0) + 1;
+            consistencyViolations.put(id, violations);
+            if (violations >= consistencyViolationThreshold) {
+                int sus = SuspicionHandler.addSuspicionPoints(id, consistencySuspicion, "AutoClickerCheck(Consistency)", plugin);
                 CheatReportHandler.handleSuspicionPunishment(player, plugin,
-                        "AutoClicker Detected (Perfect CPS Stability: " + currentCPS + ")", newSuspicion);
-                consistentClickViolations.put(playerId, 0);
-                plugin.getLogger().info("[DATA-LOG] " + player.getName() + " flagged for perfect stable CPS => " + currentCPS);
+                        String.format("AutoClicker: %d stable CPS >= %d", currentCPS, adjustedConsistencyLimit), sus);
+                plugin.getLogger().fine(String.format(
+                        "[AutoClickerCheck] %s stable CPS violation #%d", player.getName(), violations));
+                consistencyViolations.put(id, 0);
             }
-        } else {
-            // Reset violation counter if CPS is not consistently high.
-            consistentClickViolations.put(playerId, 0);
+        }
+    }
+
+    @EventHandler
+    public void onEntityDamage(EntityDamageEvent ev) {
+        if (ev.getEntity() instanceof Player p) {
+            lastVelocityChangeTime.put(p.getUniqueId(), System.currentTimeMillis());
         }
     }
 }

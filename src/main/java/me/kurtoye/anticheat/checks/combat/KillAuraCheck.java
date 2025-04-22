@@ -1,97 +1,151 @@
 package me.kurtoye.anticheat.checks.combat;
 
+import org.bukkit.GameMode;
 import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.player.PlayerTeleportEvent;
 
 import me.kurtoye.anticheat.Anticheat;
 import me.kurtoye.anticheat.handlers.CheatReportHandler;
 import me.kurtoye.anticheat.handlers.SuspicionHandler;
 import me.kurtoye.anticheat.handlers.TeleportHandler;
-import me.kurtoye.anticheat.utilities.ClickUtil;
 import me.kurtoye.anticheat.utilities.MovementUtil;
 import me.kurtoye.anticheat.utilities.PingUtil;
 import me.kurtoye.anticheat.utilities.TpsUtil;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
 /**
- * KillAuraCheck detects extended reach and rhythmic attack patterns (auto-aim/auto-click),
- * integrating MovementUtil for teleport/knockback resets, latency/TPS compensation,
- * and progressive suspicion scoring based on config values.
+ * KillAuraCheck detects:
+ *   1) Attacks beyond human reach (max_reach),
+ *   2) Unrealistically rapid multi‑target swings (multi_target_threshold per window_duration).
+ *
+ * Features:
+ *  • Config‑driven parameters under killauracheck.*
+ *  • Survival‑only, bypass‑permission gating.
+ *  • Skips right after teleport/knockback (MovementUtil.shouldIgnoreMovement).
+ *  • Ping/TPS compensation on all thresholds.
+ *  • Progressive suspicion scoring + fine debug logs.
  */
 public class KillAuraCheck implements Listener {
     private final Anticheat plugin;
     private final TeleportHandler teleportHandler;
 
-    // Tracking recent velocity and teleport events
-    private final Map<UUID, Long> lastVelocityChangeTime = new HashMap<>();
-    private final Map<UUID, Long> lastTeleport = new HashMap<>();
+    // Reset triggers
+    private final Map<UUID, Long> lastVelocityChange = new HashMap<>();
+    private final Map<UUID, Long> lastTeleport       = new HashMap<>();
 
-    // Configuration parameters
-    private final double baseReach;
-    private final int reachSuspicion;
-    private final int maxHitCPS;
-    private final int rhythmSuspicion;
-    private final long rhythmResetTime;
+    // Hit‑time window per player
+    private final Map<UUID, Deque<Long>> hitTimestamps = new HashMap<>();
 
-    // Per-player hit counts for CPS tracking
-    private final Map<UUID, Integer> hitCounts = new HashMap<>();
+    // Configurable parameters
+    private final boolean enabled;
+    private final double  maxReach;
+    private final int     reachPoints;
+    private final int     multiTargetThreshold;
+    private final long    windowDuration;
+    private final int     multiTargetPoints;
 
     public KillAuraCheck(Anticheat plugin, TeleportHandler teleportHandler) {
         this.plugin = plugin;
         this.teleportHandler = teleportHandler;
-        FileConfiguration config = plugin.getConfig();
 
-        // Reach detection config
-        this.baseReach = config.getDouble("killauracheck.base_reach", 3.0);
-        this.reachSuspicion = config.getInt("killauracheck.reach_suspicion", 5);
-
-        // Rhythmic attack config
-        this.maxHitCPS = config.getInt("killauracheck.max_hit_cps", 20);
-        this.rhythmSuspicion = config.getInt("killauracheck.rhythm_suspicion", 3);
-        this.rhythmResetTime = config.getLong("killauracheck.rhythm_reset_time", 10000);
+        FileConfiguration cfg = plugin.getConfig();
+        this.enabled               = cfg.getBoolean("killauracheck.enabled", true);
+        this.maxReach              = cfg.getDouble("killauracheck.max_reach", 3.0);
+        this.reachPoints           = cfg.getInt   ("killauracheck.reach_suspicion_points", 4);
+        this.multiTargetThreshold  = cfg.getInt   ("killauracheck.multi_target_threshold", 3);
+        this.windowDuration        = cfg.getLong  ("killauracheck.window_duration", 1000L);
+        this.multiTargetPoints     = cfg.getInt   ("killauracheck.multi_target_suspicion_points", 3);
     }
 
+    /** Record teleports to skip shortly after. */
     @EventHandler
-    public void onEntityDamage(EntityDamageByEntityEvent event) {
-        if (!(event.getDamager() instanceof Player player)) return;
-        if (!(event.getEntity() instanceof LivingEntity target)) return;
+    public void onTeleport(PlayerTeleportEvent ev) {
+        lastTeleport.put(ev.getPlayer().getUniqueId(), System.currentTimeMillis());
+    }
 
-        // Toggleable module
-        if (!plugin.getConfig().getBoolean("killauracheck.enabled", true)) return;
+    /** Record knockback/velocity changes to skip shortly after. */
+    @EventHandler
+    public void onDamage(EntityDamageEvent ev) {
+        if (ev.getEntity() instanceof Player p) {
+            lastVelocityChange.put(p.getUniqueId(), System.currentTimeMillis());
+        }
+    }
 
-        UUID uuid = player.getUniqueId();
-        // Ignore during recent teleport or knockback
-        if (MovementUtil.shouldIgnoreMovement(player, teleportHandler, lastVelocityChangeTime, lastTeleport)) {
+    /**
+     * On each hit, check:
+     *  1) Reach: distance > maxReach * pingFactor * tpsFactor
+     *  2) Multi‑target spam: > multiTargetThreshold hits in windowDuration
+     */
+    @EventHandler
+    public void onHit(EntityDamageByEntityEvent ev) {
+        if (!(ev.getDamager() instanceof Player attacker)) return;
+        UUID id = attacker.getUniqueId();
+
+        // Toggle & gating
+        if (!enabled) return;
+        if (attacker.getGameMode() != GameMode.SURVIVAL) return;
+        if (attacker.hasPermission("anticheat.bypass")) return;
+        // Skip after teleport/knockback
+        if (MovementUtil.shouldIgnoreMovement(attacker, teleportHandler, lastVelocityChange, lastTeleport)) {
+            // reset window to avoid carry‑over
+            hitTimestamps.remove(id);
             return;
         }
 
-        // ===== Reach Detection =====
-        double distance = player.getLocation().distance(target.getLocation());
-        double allowedReach = baseReach
-                * PingUtil.getPingCompensationFactor(player)
-                * TpsUtil.getTpsCompensationFactor();
+        long now = System.currentTimeMillis();
+        Entity target = ev.getEntity();
+
+        // --- 1) Reach check ---
+        double distance = attacker.getLocation().distance(target.getLocation());
+        double pingFactor = PingUtil.getPingCompensationFactor(attacker);
+        double tpsFactor  = TpsUtil.getTpsCompensationFactor();
+        double allowedReach = maxReach * pingFactor * tpsFactor;
+
         if (distance > allowedReach) {
-            int suspicion = SuspicionHandler.addSuspicionPoints(
-                    uuid, reachSuspicion, "KillAura/Reach", plugin);
-            CheatReportHandler.handleSuspicionPunishment(player, plugin, "KillAura/Reach", suspicion);
+            int sus = SuspicionHandler.addSuspicionPoints(id, reachPoints, "KillAuraCheck(Reach)", plugin);
+            CheatReportHandler.handleSuspicionPunishment(
+                    attacker, plugin,
+                    String.format("KillAura: reach %.2f > %.2f", distance, allowedReach),
+                    sus
+            );
+            plugin.getLogger().fine(String.format(
+                    "[KillAuraCheck] %s reach=%.2f > allowed=%.2f",
+                    attacker.getName(), distance, allowedReach
+            ));
         }
 
-        // ===== Rhythmic Attack Detection =====
-        hitCounts.put(uuid, hitCounts.getOrDefault(uuid, 0) + 1);
-        int currentCPS = ClickUtil.calculateCPS(uuid, hitCounts, rhythmResetTime);
-        if (ClickUtil.isConsistentlySameCPS(uuid, currentCPS, maxHitCPS)) {
-            int suspicion = SuspicionHandler.addSuspicionPoints(
-                    uuid, rhythmSuspicion, "KillAura/Rhythm", plugin);
-            CheatReportHandler.handleSuspicionPunishment(player, plugin, "KillAura/Rhythm", suspicion);
-            // Reset hit count after suspicion flagged
-            hitCounts.put(uuid, 0);
+        // --- 2) Multi‑target spam check ---
+        Deque<Long> dq = hitTimestamps.computeIfAbsent(id, k -> new ArrayDeque<>());
+        // purge old hits
+        while (!dq.isEmpty() && now - dq.peekFirst() > windowDuration) {
+            dq.pollFirst();
+        }
+        dq.addLast(now);
+
+        if (dq.size() > multiTargetThreshold) {
+            int sus = SuspicionHandler.addSuspicionPoints(id, multiTargetPoints, "KillAuraCheck(MultiTarget)", plugin);
+            CheatReportHandler.handleSuspicionPunishment(
+                    attacker, plugin,
+                    String.format("KillAura: %d hits in %dms", dq.size(), windowDuration),
+                    sus
+            );
+            plugin.getLogger().fine(String.format(
+                    "[KillAuraCheck] %s %d hits in %dms > %d",
+                    attacker.getName(), dq.size(), windowDuration, multiTargetThreshold
+            ));
+            // reset for next spike
+            dq.clear();
         }
     }
 }
