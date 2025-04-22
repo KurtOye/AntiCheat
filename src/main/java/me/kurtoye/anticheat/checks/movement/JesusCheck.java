@@ -1,28 +1,36 @@
 package me.kurtoye.anticheat.checks.movement;
 
-import me.kurtoye.anticheat.Anticheat;
-import me.kurtoye.anticheat.handlers.CheatReportHandler;
-import me.kurtoye.anticheat.handlers.SuspicionHandler;
-import me.kurtoye.anticheat.utilities.*;
-import me.kurtoye.anticheat.handlers.TeleportHandler;
+import org.bukkit.GameMode;
+import org.bukkit.Material;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.util.Vector;
+
+import me.kurtoye.anticheat.Anticheat;
+import me.kurtoye.anticheat.handlers.CheatReportHandler;
+import me.kurtoye.anticheat.handlers.SuspicionHandler;
+import me.kurtoye.anticheat.handlers.TeleportHandler;
+import me.kurtoye.anticheat.utilities.MovementUtil;
+import me.kurtoye.anticheat.utilities.PingUtil;
+import me.kurtoye.anticheat.utilities.TpsUtil;
+import me.kurtoye.anticheat.utilities.VelocityUtil;
+import me.kurtoye.anticheat.utilities.WaterMovementUtil;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
 /**
- * 🚀 Refined JesusCheck:
- * - Integrates incremental suspicion for water-walking, sprint-jumping, and bouncing exploits.
- * - Uses config-based thresholds and suspicion increments for adaptive detection.
- * - Minimizes false positives by tracking acceleration, vertical velocity, and environment checks.
+ * Advanced JesusCheck with integrated simple water-walk detection.
+ * - Simple horizontal/vertical checks for quick water-walk flags.
+ * - Sprint-jump exploit detection.
+ * - Sustained liquid-walk timing.
+ * - Teleport/knockback resets, ping/TPS compensation, and progressive scoring.
  */
 public class JesusCheck implements Listener {
-
     private final Anticheat plugin;
     private final TeleportHandler teleportHandler;
 
@@ -32,106 +40,118 @@ public class JesusCheck implements Listener {
     private final Map<UUID, Long> lastVelocityChangeTime = new HashMap<>();
     private final Map<UUID, Long> lastTeleport = new HashMap<>();
 
-    // Config-based thresholds
-    private final long minLiquidWalkTime;      // e.g., 2500 ms
-    private final double maxAcceleration;      // e.g., 3.5
+    // Simple detection thresholds
+    private final double simpleMaxHorizontalSpeed;
+    private final double simpleMaxVerticalOffset;
+    private final int simpleSuspicionPoints;
 
-    // Suspicion increments
-    private final int sprintJumpSuspicion;
-    private final int liquidWalkSuspicion;
-
-    // Bouncing thresholds
-    private static final double MIN_BOUNCE_VELOCITY = -0.12;
-    private static final double MAX_BOUNCE_VELOCITY =  0.12;
+    // Advanced detection thresholds
+    private final long minLiquidWalkTime;      // ms before flagging sustained walking
+    private final double maxAcceleration;      // vertical accel limit
+    private final int sprintJumpSuspicion;     // points for sprint-jump exploit
+    private final int liquidWalkSuspicion;     // points for sustained water-walking
 
     public JesusCheck(Anticheat plugin, TeleportHandler teleportHandler) {
         this.plugin = plugin;
         this.teleportHandler = teleportHandler;
-
-        FileConfiguration config = plugin.getConfig();
-        this.minLiquidWalkTime  = config.getLong("jesuscheck.min_liquid_walk_time", 2500);   // Default: 2.5s
-        this.maxAcceleration    = config.getDouble("jesuscheck.max_acceleration", 3.5);
-
-        // Suspicion increments (config-based)
-        this.sprintJumpSuspicion = config.getInt("jesuscheck.sprintjump_suspicion_points", 3);
-        this.liquidWalkSuspicion = config.getInt("jesuscheck.liquidwalk_suspicion_points", 2);
+        FileConfiguration cfg = plugin.getConfig();
+        // Simple config
+        this.simpleMaxHorizontalSpeed = cfg.getDouble("jesus.max_horizontal_speed", 1.5);
+        this.simpleMaxVerticalOffset  = cfg.getDouble("jesus.max_vertical_offset", 0.1);
+        this.simpleSuspicionPoints    = cfg.getInt("jesus.suspicion_points", 2);
+        // Advanced config
+        this.minLiquidWalkTime    = cfg.getLong("jesuscheck.min_liquid_walk_time", 2500);
+        this.maxAcceleration      = cfg.getDouble("jesuscheck.max_acceleration", 3.5);
+        this.sprintJumpSuspicion  = cfg.getInt("jesuscheck.sprintjump_suspicion_points", 3);
+        this.liquidWalkSuspicion  = cfg.getInt("jesuscheck.liquidwalk_suspicion_points", 2);
     }
 
     @EventHandler
     public void onPlayerMove(PlayerMoveEvent event) {
         Player player = event.getPlayer();
         UUID playerId = player.getUniqueId();
+        long now = System.currentTimeMillis();
 
-        // Current system time & player's vertical velocity
-        long currentTime = System.currentTimeMillis();
-        double verticalVelocity = player.getVelocity().getY();
-
-        // 1) Validate if we should skip checks (e.g. Creative, knockback, recent teleport)
+        // Module toggle & mode/permission checks
+        if (!plugin.getConfig().getBoolean("jesus.enabled", true)) return;
+        if (player.getGameMode() != GameMode.SURVIVAL) return;
+        if (player.hasPermission("anticheat.bypass")) return;
+        // Skip after teleport or knockback
         if (MovementUtil.shouldIgnoreMovement(player, teleportHandler, lastVelocityChangeTime, lastTeleport)) {
             return;
         }
 
-        // 2) Ignore natural bouncing & floating
-        if (verticalVelocity >= MIN_BOUNCE_VELOCITY && verticalVelocity <= MAX_BOUNCE_VELOCITY) {
-            return;
+        // ----- Simple horizontal/vertical water-walk detection -----
+        Vector from = event.getFrom().toVector().setY(0);
+        Vector to   = event.getTo().toVector().setY(0);
+        double horizontalDist = from.distance(to);
+        double verticalOffset = Math.abs(event.getTo().getY() - event.getFrom().getY());
+        // Check block below is water
+        Material below = event.getFrom().clone().subtract(0,1,0).getBlock().getType();
+        if (below == Material.WATER || below == Material.KELP) {
+            double allowedSpeed = simpleMaxHorizontalSpeed
+                    * PingUtil.getPingCompensationFactor(player)
+                    * TpsUtil.getTpsCompensationFactor();
+            if (horizontalDist > allowedSpeed || verticalOffset < simpleMaxVerticalOffset) {
+                int sus = SuspicionHandler.addSuspicionPoints(
+                        playerId, simpleSuspicionPoints, "JesusCheck(Simple)", plugin);
+                CheatReportHandler.handleSuspicionPunishment(
+                        player, plugin, "Jesus Hack (Simple)", sus);
+                return;
+            }
         }
 
-        // 3) Ignore known safe conditions: Frost Walker, boats, Depth Strider, etc.
-        if (WaterMovementUtil.isPlayerUsingFrostWalker(player)
-                || WaterMovementUtil.isPlayerInBoat(player)
-                || WaterMovementUtil.isPlayerUsingDepthStrider(player)) {
-            return;
-        }
-
-        // 4) Detect sprint-jumping on water exploit
+        // ----- Sprint-jump exploit detection -----
+        double vertVel = player.getVelocity().getY();
         if (WaterMovementUtil.isPlayerSprintJumpingOnWater(player)) {
-            double lastStoredY = lastYVelocity.getOrDefault(playerId, verticalVelocity);
-            if (verticalVelocity < -0.08) {
-                // Record if they sank below -0.08 once
-                lastStoredY = verticalVelocity;
-                lastYVelocity.put(playerId, lastStoredY);
+            double lastY = lastYVelocity.getOrDefault(playerId, vertVel);
+            if (vertVel < -0.08) {
+                lastYVelocity.put(playerId, vertVel);
+                lastY = vertVel;
             }
-            // Flag if they consistently maintain jump velocity above water
-            if (lastStoredY > -0.08 && verticalVelocity >= 0.08) {
-                int suspicion = SuspicionHandler.addSuspicionPoints(playerId, sprintJumpSuspicion, "JesusCheck (Sprint-Jump Exploit)", plugin);
-                CheatReportHandler.handleSuspicionPunishment(player, plugin, "Jesus Hack (Sprint-Jumping)", suspicion);
+            if (lastY > -0.08 && vertVel >= 0.08) {
+                int sus = SuspicionHandler.addSuspicionPoints(
+                        playerId, sprintJumpSuspicion, "JesusCheck(SprintJump)", plugin);
+                CheatReportHandler.handleSuspicionPunishment(
+                        player, plugin, "Jesus Hack (Sprint-Jump)", sus);
+                return;
             }
-            return;
         }
-
-        // 5) Reset tracking if player left water or used ladders/vines
+        // ----- Sustained water-walking detection -----
         if (!WaterMovementUtil.isPlayerRunningOnWater(player)) {
             waterWalkStartTime.remove(playerId);
             return;
         }
-
-        // 6) Start tracking water-walking time if not already
         if (!waterWalkStartTime.containsKey(playerId)) {
-            waterWalkStartTime.put(playerId, currentTime);
+            waterWalkStartTime.put(playerId, now);
             return;
         }
-
-        // 7) Ping & TPS compensation to avoid lag-based false positives
-        double pingFactor = PingUtil.getPingCompensationFactor(player);
-        double tpsFactor  = TpsUtil.getTpsCompensationFactor();
-        double adjustedTimeThreshold = minLiquidWalkTime * pingFactor * tpsFactor;
-
-        // 8) Check vertical acceleration to avoid spurious flags
-        double acceleration = VelocityUtil.getAcceleration(player);
-        if (acceleration > maxAcceleration) {
-            return;
-        }
-
-        // 9) If the player has been on water too long, suspect liquid-walk
-        long startedWalking = waterWalkStartTime.get(playerId);
-        if ((currentTime - startedWalking) > adjustedTimeThreshold) {
-            int suspicion = SuspicionHandler.addSuspicionPoints(playerId, liquidWalkSuspicion, "JesusCheck (Liquid Walking)", plugin);
-            CheatReportHandler.handleSuspicionPunishment(player, plugin, "Jesus Hack (Water-Walking)", suspicion);
+        // Acceleration check
+        double accel = VelocityUtil.getAcceleration(player);
+        if (accel > maxAcceleration) return;
+        // Time threshold with compensation
+        double timeFactor = minLiquidWalkTime
+                * PingUtil.getPingCompensationFactor(player)
+                * TpsUtil.getTpsCompensationFactor();
+        if ((now - waterWalkStartTime.get(playerId)) > timeFactor) {
+            int sus = SuspicionHandler.addSuspicionPoints(
+                    playerId, liquidWalkSuspicion, "JesusCheck(Liquid)", plugin);
+            CheatReportHandler.handleSuspicionPunishment(
+                    player, plugin, "Jesus Hack (Liquid)", sus);
         }
     }
 
-    // 10) Possibly track velocity changes from knockback
-    // or entityDamageEvent if needed, similar to SpeedCheck
-
-
+    @EventHandler
+    public void onEntityDamage(org.bukkit.event.entity.EntityDamageEvent event) {
+        if (event.getEntity() instanceof Player p
+                && event.getCause() == org.bukkit.event.entity.EntityDamageEvent.DamageCause.ENTITY_ATTACK) {
+            lastVelocityChangeTime.put(
+                    p.getUniqueId(), System.currentTimeMillis());
+        }
+        if (event.getEntity() instanceof Player p
+                && event.getCause() == org.bukkit.event.entity.EntityDamageEvent.DamageCause.FALL) {
+            // reset simple float detection when landing
+            waterWalkStartTime.remove(p.getUniqueId());
+        }
+    }
 }

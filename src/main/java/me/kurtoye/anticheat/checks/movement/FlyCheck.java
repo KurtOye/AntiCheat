@@ -1,4 +1,13 @@
 package me.kurtoye.anticheat.checks.movement;
+
+import org.bukkit.GameMode;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
+
 import me.kurtoye.anticheat.Anticheat;
 import me.kurtoye.anticheat.handlers.CheatReportHandler;
 import me.kurtoye.anticheat.handlers.SuspicionHandler;
@@ -6,111 +15,91 @@ import me.kurtoye.anticheat.handlers.TeleportHandler;
 import me.kurtoye.anticheat.utilities.MovementUtil;
 import me.kurtoye.anticheat.utilities.PingUtil;
 import me.kurtoye.anticheat.utilities.TpsUtil;
-import org.bukkit.GameMode;
-import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerMoveEvent;
-import org.bukkit.util.Vector;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * FlyCheck detects players hovering or flying by exceeding allowed air time.
+ * - Applies ping/TPS compensation and configurable leeway.
+ * - Resets after knockback or teleport via MovementUtil.
+ * - Uses progressive suspicion scoring.
+ */
 public class FlyCheck implements Listener {
-
     private final Anticheat plugin;
     private final TeleportHandler teleportHandler;
 
-    // Base allowed air time before flagging (in ms)
-    private final long baseMaxAirTime;
-    // Tolerance for natural vertical velocity changes (suggesting natural falling)
-    private final double velocityTolerance;
-    // Points to add per violation
-    private final int suspicionPoints;
-    // Tolerance for horizontal movement; if too low, it may indicate hovering
-    private final double horizontalSpeedTolerance;
+    // Tracking airborne start times and resets
+    private final Map<UUID, Long> airStartTime = new HashMap<>();
+    private final Map<UUID, Long> lastVelocityChangeTime = new HashMap<>();
+    private final Map<UUID, Long> lastTeleport = new HashMap<>();
 
-    // Tracking: when the player first left the ground and their last vertical velocity.
-    private final Map<UUID, Long> airStartTimes = new HashMap<>();
-    private final Map<UUID, Double> lastVerticalVelocity = new HashMap<>();
+    // Configurable parameters
+    private final long maxAirTime;         // Base max air time in ms
+    private final double violationLeeway;  // Multiplier for leeway
+    private final int suspicionPoints;     // Points per violation
 
     public FlyCheck(Anticheat plugin, TeleportHandler teleportHandler) {
         this.plugin = plugin;
         this.teleportHandler = teleportHandler;
-        FileConfiguration config = plugin.getConfig();
-        // Base values read from config.yml (with sensible defaults)
-        this.baseMaxAirTime = config.getLong("flycheck.max_air_time", 3000); // default 3000ms
-        this.velocityTolerance = config.getDouble("flycheck.velocity_tolerance", 0.1); // default 0.1
-        this.suspicionPoints = config.getInt("flycheck.suspicion_points", 3); // default 3 points
-        // New configuration for horizontal movement tolerance (to detect hovering)
-        this.horizontalSpeedTolerance = config.getDouble("flycheck.horizontal_speed_tolerance", 0.05); // default 0.05
+        FileConfiguration cfg = plugin.getConfig();
+        this.maxAirTime       = cfg.getLong("flycheck.max_air_time", 1000);
+        this.violationLeeway  = cfg.getDouble("flycheck.leeway", 1.0);
+        this.suspicionPoints  = cfg.getInt("flycheck.suspicion_points", 3);
     }
 
     @EventHandler
     public void onPlayerMove(PlayerMoveEvent event) {
         Player player = event.getPlayer();
-        UUID playerId = player.getUniqueId();
+        UUID uuid = player.getUniqueId();
 
-        // Skip checks for legitimate conditions:
-        if (player.getGameMode() == GameMode.CREATIVE ||
-                player.getGameMode() == GameMode.SPECTATOR ||
-                player.isGliding() || player.isFlying()) {
-            resetPlayer(playerId);
+        // Toggle, gamemode, and bypass
+        if (!plugin.getConfig().getBoolean("flycheck.enabled", true)) return;
+        if (player.getGameMode() != GameMode.SURVIVAL) return;
+        if (player.hasPermission("anticheat.bypass")) return;
+
+        // Skip after teleports/knockback
+        if (MovementUtil.shouldIgnoreMovement(player, teleportHandler, lastVelocityChangeTime, lastTeleport)) {
+            airStartTime.remove(uuid);
             return;
         }
 
-        // Ignore checks if movement should be skipped (e.g., recent teleport/knockback)
-        if (MovementUtil.shouldIgnoreMovement(player, teleportHandler, null, null)) {
-            resetPlayer(playerId);
-            return;
-        }
-
-        // If the player is on the ground, reset our tracking data.
+        // If on ground, reset
         if (player.isOnGround()) {
-            resetPlayer(playerId);
+            airStartTime.remove(uuid);
             return;
         }
 
-        long currentTime = System.currentTimeMillis();
-        // Dynamically adjust allowed air time based on server lag
-        double adjustedMaxAirTime = baseMaxAirTime * PingUtil.getPingCompensationFactor(player)
-                * TpsUtil.getTpsCompensationFactor();
-
-        // Record initial air time and vertical velocity if not already tracking
-        if (!airStartTimes.containsKey(playerId)) {
-            airStartTimes.put(playerId, currentTime);
-            lastVerticalVelocity.put(playerId, player.getVelocity().getY());
+        long now = System.currentTimeMillis();
+        // Initialize tracking
+        if (!airStartTime.containsKey(uuid)) {
+            airStartTime.put(uuid, now);
             return;
         }
 
-        long timeInAir = currentTime - airStartTimes.get(playerId);
-        double currentYVelocity = player.getVelocity().getY();
-        double previousYVelocity = lastVerticalVelocity.getOrDefault(playerId, currentYVelocity);
-        double velocityChange = Math.abs(currentYVelocity - previousYVelocity);
-        lastVerticalVelocity.put(playerId, currentYVelocity);
+        long start = airStartTime.get(uuid);
+        // Compute adjusted limit
+        double pingFactor = PingUtil.getPingCompensationFactor(player);
+        double tpsFactor  = TpsUtil.getTpsCompensationFactor();
+        long adjustedMax = (long)(maxAirTime * pingFactor * tpsFactor * violationLeeway);
 
-        // Calculate horizontal speed (ignoring vertical component)
-        Vector horizontalVelocity = player.getVelocity().clone();
-        horizontalVelocity.setY(0);
-        double horizontalSpeed = horizontalVelocity.length();
-
-        // Determine if the player is hovering:
-        // They exhibit minimal vertical change and minimal horizontal movement.
-        boolean isHovering = (velocityChange < velocityTolerance) && (horizontalSpeed < horizontalSpeedTolerance);
-
-        // If the player has been airborne too long and is hovering, flag as flying.
-        if (timeInAir > adjustedMaxAirTime && isHovering) {
-            int newSuspicion = SuspicionHandler.addSuspicionPoints(playerId, suspicionPoints, "FlyCheck", plugin);
-            CheatReportHandler.handleSuspicionPunishment(player, plugin, "Fly Hack Detected", newSuspicion);
-            // Reset the air start time to avoid immediate repeated flags
-            airStartTimes.put(playerId, currentTime);
+        // If airborne too long, flag
+        if (now - start > adjustedMax) {
+            int sus = SuspicionHandler.addSuspicionPoints(uuid, suspicionPoints, "FlyCheck", plugin);
+            CheatReportHandler.handleSuspicionPunishment(player, plugin, "Fly Hack", sus);
+            plugin.getLogger().fine(String.format(
+                    "[FlyCheck] %s airborne for %dms > %dms",
+                    player.getName(), now - start, adjustedMax));
+            // Reset to avoid repeat spam
+            airStartTime.put(uuid, now);
         }
     }
 
-    private void resetPlayer(UUID playerId) {
-        airStartTimes.remove(playerId);
-        lastVerticalVelocity.remove(playerId);
+    @EventHandler
+    public void onEntityDamage(EntityDamageEvent event) {
+        if (event.getEntity() instanceof Player p) {
+            lastVelocityChangeTime.put(p.getUniqueId(), System.currentTimeMillis());
+        }
     }
 }
