@@ -43,10 +43,15 @@ public class CheatReportHandler {
 
         // Apply staged punishments based on the updated short-term suspicion value.
         if (newSuspicion >= STAGE3_THRESHOLD) {
+            // Log to server console
             plugin.getLogger().warning("Stage 3 reached: " + player.getName() + " flagged for " + reason);
+            // Send in-game feedback to the player being punished
             player.sendMessage(ChatColor.RED + "[AntiCheat] " + reason + " detected! (Stage 3 => Ban)");
+            // Execute the ban command via the server console (30m ban)
             Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "tempban " + player.getName() + " 30m " + reason);
+            // Clear the player’s lifetime suspicion history for this cheat — prevents further automatic punishment
             plugin.getHistoryHandler().resetLifetimeSuspicionForCheat(playerId, reason);
+            // Exit this method to prevent duplicate processing
             return;
         } else if (newSuspicion >= STAGE2_THRESHOLD) {
             plugin.getLogger().warning("Stage 2 reached: " + player.getName() + " flagged for " + reason);

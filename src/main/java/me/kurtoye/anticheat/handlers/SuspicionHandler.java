@@ -26,14 +26,13 @@ public class SuspicionHandler {
     }
 
     public static int addSuspicionPoints(UUID playerId, int points, String reason, Anticheat plugin) {
-        decaySuspicionIfNeeded(playerId);
-        int oldValue = suspicionPoints.getOrDefault(playerId, 0);
-        int newValue = oldValue + points;
-        suspicionPoints.put(playerId, newValue);
-        lastSuspicionTime.put(playerId, System.currentTimeMillis());
+        decaySuspicionIfNeeded(playerId); // Clears outdated suspicion if threshold expired
+        int oldValue = suspicionPoints.getOrDefault(playerId, 0); // Previous suspicion
+        int newValue = oldValue + points; // Add new suspicion
+        suspicionPoints.put(playerId, newValue); // Save updated value
+        lastSuspicionTime.put(playerId, System.currentTimeMillis()); // Timestamp update
 
-        // Record this suspicion event in the lifetime history.
-        plugin.getHistoryHandler().addLifetimeSuspicionForCheat(playerId, reason, points);
+        plugin.getHistoryHandler().addLifetimeSuspicionForCheat(playerId, reason, points); // Persistent logging
         return newValue;
     }
 
