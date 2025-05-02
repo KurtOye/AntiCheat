@@ -1,6 +1,3 @@
-// 🚀 Fully Optimized WaterMovementUtil (Performance, Accuracy & Maintainability)
-// ✅ Handles all water-based movement validation with improved efficiency.
-
 package me.kurtoye.anticheat.utilities;
 
 import org.bukkit.Material;
@@ -8,91 +5,78 @@ import org.bukkit.entity.Player;
 import org.bukkit.enchantments.Enchantment;
 
 /**
- * WaterMovementUtil handles **all water-based movement validation**.
- * - Used in `JesusCheck` and other movement-related checks.
+ * Utility class for validating legitimate player movement across water surfaces.
+ *
+ * Supports detection logic used in anti-cheat modules by accounting for:
+ * - Sprint-jumping behavior
+ * - Frost Walker ice paths
+ * - Boats and Depth Strider mechanics
+ * - Bubble columns and swim states
  */
 public class WaterMovementUtil {
+
     /**
-     * Determines if the player's water movement is **legitimate**.
-     * - Allows swimming, bubble columns, lily pads, and gliding.
-     *
-     * @param player The player being checked
-     * @return true if movement is legitimate
+     * Checks if the player is moving through water in a naturally valid way.
      */
     public static boolean isLegitWaterMovement(Player player) {
-        Material blockAtFeet = player.getLocation().getBlock().getType();
-        Material blockBelow = player.getLocation().subtract(0, 1, 0).getBlock().getType();
+        Material feet = player.getLocation().getBlock().getType();
+        Material below = player.getLocation().subtract(0, 1, 0).getBlock().getType();
 
-        return player.isSwimming() ||
-                blockAtFeet == Material.WATER ||
-                blockBelow == Material.BUBBLE_COLUMN ||
-                blockBelow == Material.LILY_PAD ||
-                player.isGliding();
+        return player.isSwimming()
+                || feet == Material.WATER
+                || below == Material.BUBBLE_COLUMN
+                || below == Material.LILY_PAD
+                || player.isGliding();
     }
 
     /**
-     * Determines if the player is **running on water**.
-     * - Prevents false positives by ensuring they are **not swimming or flying**.
-     *
-     * @param player The player being checked
-     * @return true if the player is sprinting on water
+     * Checks whether the player is sprinting across the surface of water.
      */
     public static boolean isPlayerRunningOnWater(Player player) {
-        Material blockAtFeet = player.getLocation().getBlock().getType();
-        Material blockBelow = player.getLocation().subtract(0, 1, 0).getBlock().getType();
+        Material feet = player.getLocation().getBlock().getType();
+        Material below = player.getLocation().subtract(0, 1, 0).getBlock().getType();
 
-        return (blockAtFeet == Material.WATER || blockBelow == Material.WATER) &&
-                !player.isSwimming() && !player.isFlying() && player.isSprinting();
+        return (feet == Material.WATER || below == Material.WATER)
+                && !player.isSwimming()
+                && !player.isFlying();
     }
 
     /**
-     * Determines if the player is **sprint-jumping on water**.
-     * - Ensures velocity is high enough to indicate a jump.
-     *
-     * @param player The player being checked
-     * @return true if the player is sprint-jumping on water
+     * Detects high-velocity jumping over water, used to catch "Jesus" sprint-jump bypasses.
      */
     public static boolean isPlayerSprintJumpingOnWater(Player player) {
-        Material blockBelow = player.getLocation().subtract(0, 1, 0).getBlock().getType();
+        Material below = player.getLocation().subtract(0, 1, 0).getBlock().getType();
 
-        return blockBelow == Material.WATER &&
-                player.isSprinting() &&
-                player.getVelocity().getY() > 0.25; // Adjusted threshold for better accuracy
+        return below == Material.WATER
+                && player.isSprinting()
+                && player.getVelocity().getY() > 0.25;
     }
 
-    /**
-     * Checks if the player is using **Frost Walker** enchantment.
-     *
-     * @param player The player being checked
-     * @return true if the player is walking on ice created by Frost Walker
-     */
     public static boolean isPlayerUsingFrostWalker(Player player) {
         return player.getLocation().getBlock().getType().name().contains("ICE");
     }
 
-    /**
-     * Determines if the player is inside a **boat**.
-     *
-     * @param player The player being checked
-     * @return true if the player is in a boat
-     */
     public static boolean isPlayerInBoat(Player player) {
         return player.isInsideVehicle();
     }
 
-    /**
-     * Determines if the player is using **Depth Strider** boots.
-     *
-     * @param player The player being checked
-     * @return true if the player has Depth Strider enchantment
-     */
     public static boolean isPlayerUsingDepthStrider(Player player) {
-        return player.getInventory().getBoots() != null &&
-                player.getInventory().getBoots().containsEnchantment(Enchantment.DEPTH_STRIDER);
+        return player.getInventory().getBoots() != null
+                && player.getInventory().getBoots().containsEnchantment(Enchantment.DEPTH_STRIDER);
     }
 
     public static boolean isPlayerUsingAquaAffinity(Player player) {
-        return player.getInventory().getHelmet() != null &&
-                player.getInventory().getHelmet().containsEnchantment(Enchantment.AQUA_AFFINITY);
+        return player.getInventory().getHelmet() != null
+                && player.getInventory().getHelmet().containsEnchantment(Enchantment.AQUA_AFFINITY);
     }
+
+    /**
+     * Checks if the player is standing inside a bubble column.
+     * Used to prevent flagging upward water movement as cheating.
+     */
+    public static boolean isInBubbleColumn(Player player) {
+        Material blockType = player.getLocation().getBlock().getType();
+        return blockType == Material.BUBBLE_COLUMN;
+    }
+
 }

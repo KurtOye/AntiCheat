@@ -1,18 +1,16 @@
-// 🚀 Fully Optimized PingUtil (Performance, Accuracy & Maintainability)
-// ✅ Uses logarithmic scaling for better lag compensation.
-// ✅ Ensures version compatibility and prevents unnecessary errors.
-
 package me.kurtoye.anticheat.utilities;
 
 import org.bukkit.entity.Player;
 
+/**
+ * Utility for retrieving player ping and applying network compensation.
+ * Used to adjust detection thresholds based on lag and latency.
+ */
 public class PingUtil {
+
     /**
-     * Retrieves the ping compensation factor.
-     * - Uses logarithmic scaling instead of linear for better lag adjustment.
-     *
-     * @param player The player whose ping is being checked.
-     * @return Compensation factor for movement checks.
+     * Returns a multiplier based on player's current ping.
+     * Helps soften detection thresholds under high latency.
      */
     public static double getPingCompensationFactor(Player player) {
         int ping = getPing(player);
@@ -22,12 +20,8 @@ public class PingUtil {
     }
 
     /**
-     * Retrieves the ping of the player.
-     * - Works for PaperMC 1.18+.
-     * - Prevents unnecessary stack traces on failure.
-     *
-     * @param player The player whose ping is being retrieved.
-     * @return The player's ping or -1 if retrieval fails.
+     * Safely retrieves the ping of a player.
+     * Compatible with PaperMC 1.18+.
      */
     public static int getPing(Player player) {
         try {

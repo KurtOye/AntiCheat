@@ -3,6 +3,7 @@ package me.kurtoye.anticheat.checks.chat;
 import me.kurtoye.anticheat.Anticheat;
 import me.kurtoye.anticheat.handlers.CheatReportHandler;
 import me.kurtoye.anticheat.handlers.SuspicionHandler;
+
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -14,93 +15,84 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * 🚀 Refined CommandAbuseCheck:
- * - Integrates incremental suspicion scoring for spam/restricted commands.
- * - Uses config-based thresholds for cooldowns, restricted commands, and suspicion points.
- * - Minimizes false positives via incremental approach.
+ * Detects excessive or unauthorized command usage by players.
+ *
+ * The check covers two main types of command abuse:
+ * 1. Repeatedly sending restricted commands (e.g., /msg, /home).
+ * 2. Spamming commands faster than an allowed cooldown interval.
+ *
+ * Applies configurable suspicion scoring and integrates with the punishment handler.
  */
 public class CommandAbuseCheck implements Listener {
 
     private final Anticheat plugin;
-    private final long commandCooldown;
-    private final int maxCommandSpam;
-    private final String[] restrictedCommands;
 
-    // Suspicion increments
-    private final int cooldownSuspicionPoints;
-    private final int restrictedCmdSuspicionPoints;
+    // Configurable thresholds
+    private final boolean enabled;
+    private final long cooldownMs;
+    private final int maxSpam;
+    private final String[] restrictedCmds;
+    private final int cooldownPoints;
+    private final int restrictedPoints;
 
-    // Tracking
-    private final Map<UUID, Long> lastCommandTime = new HashMap<>();
-    private final Map<UUID, Integer> commandCount = new HashMap<>();
+    // Tracking recent usage
+    private final Map<UUID, Long> lastCommand = new HashMap<>();
+    private final Map<UUID, Integer> spamCount = new HashMap<>();
 
+    /**
+     * Initializes command abuse detection and loads all thresholds from config.yml.
+     */
     public CommandAbuseCheck(Anticheat plugin) {
         this.plugin = plugin;
-        FileConfiguration config = plugin.getConfig();
+        FileConfiguration cfg = plugin.getConfig();
 
-        // Basic config values
-        this.commandCooldown = config.getLong("commandabuse.cooldown", 500);
-        this.maxCommandSpam = config.getInt("commandabuse.max_repeats", 4);
-        this.restrictedCommands = config.getStringList("commandabuse.restricted_commands").toArray(new String[0]);
-
-        // Suspicion increments
-        this.cooldownSuspicionPoints = config.getInt("commandabuse.cooldown_suspicion_points", 2);
-        this.restrictedCmdSuspicionPoints = config.getInt("commandabuse.restricted_suspicion_points", 3);
-    }
-
-    @EventHandler
-    public void onPlayerCommand(PlayerCommandPreprocessEvent event) {
-        Player player = event.getPlayer();
-        UUID playerId = player.getUniqueId();
-        long currentTime = System.currentTimeMillis();
-        String command = event.getMessage().toLowerCase();
-
-        // 1) Check for restricted command usage
-        for (String restricted : restrictedCommands) {
-            if (command.startsWith(restricted)) {
-                handleRestrictedCommand(player, playerId, command, currentTime, event);
-                return;
-            }
-        }
-
-        // 2) Check for command cooldown spam
-        if (lastCommandTime.containsKey(playerId)) {
-            long timeSinceLastCommand = currentTime - lastCommandTime.get(playerId);
-            if (timeSinceLastCommand < commandCooldown) {
-                // Suspicion increment instead of direct punishment
-                int suspicion = SuspicionHandler.addSuspicionPoints(playerId, cooldownSuspicionPoints, "CommandAbuse (Cooldown)", plugin);
-                CheatReportHandler.handleSuspicionPunishment(player, plugin, "Command Abuse (Cooldown Violation)", suspicion);
-
-                // Cancel the event
-                event.setCancelled(true);
-                return;
-            }
-        }
-
-        // 3) Record successful command usage time
-        lastCommandTime.put(playerId, currentTime);
+        this.enabled = cfg.getBoolean("commandabuse.enabled", true);
+        this.cooldownMs = cfg.getLong("commandabuse.cooldown", 50);
+        this.maxSpam = cfg.getInt("commandabuse.max_repeats", 4);
+        this.restrictedCmds = cfg.getStringList("commandabuse.restricted_commands").toArray(new String[0]);
+        this.cooldownPoints = cfg.getInt("commandabuse.cooldown_suspicion_points", 2);
+        this.restrictedPoints = cfg.getInt("commandabuse.restricted_suspicion_points", 3);
     }
 
     /**
-     * Handles repeated or restricted command usage,
-     * integrated with suspicion-based approach.
+     * Detects and handles players sending restricted or excessively frequent commands.
+     * Flags repeated abuse patterns using progressive suspicion logic.
      */
-    private void handleRestrictedCommand(Player player, UUID playerId, String command, long currentTime, PlayerCommandPreprocessEvent event) {
-        int count = commandCount.getOrDefault(playerId, 0) + 1;
-        commandCount.put(playerId, count);
+    @EventHandler
+    public void onCommand(PlayerCommandPreprocessEvent event) {
+        Player p = event.getPlayer();
+        UUID id = p.getUniqueId();
+        long now = System.currentTimeMillis();
+        String cmd = event.getMessage().toLowerCase();
 
-        if (count >= maxCommandSpam) {
-            // Instead of direct punishment, add suspicion
-            int suspicion = SuspicionHandler.addSuspicionPoints(playerId, restrictedCmdSuspicionPoints, "CommandAbuse (Restricted Spam)", plugin);
-            CheatReportHandler.handleSuspicionPunishment(player, plugin, "Command Abuse (Restricted Command Spam: " + command + ")", suspicion);
+        if (!enabled) return;
 
-            // Cancel
-            event.setCancelled(true);
-            // Reset count
-            commandCount.put(playerId, 0);
+        // --- 1) Detect Restricted Commands ---
+        for (String restricted : restrictedCmds) {
+            if (cmd.startsWith(restricted)) {
+                int count = spamCount.getOrDefault(id, 0) + 1;
+                spamCount.put(id, count);
 
-            // Update last command time
-            lastCommandTime.put(playerId, currentTime);
+                if (count >= maxSpam) {
+                    int sus = SuspicionHandler.addSuspicionPoints(id, restrictedPoints, "CommandAbuse(Restricted)", plugin);
+                    CheatReportHandler.handleSuspicionPunishment(p, plugin, "Command Abuse: " + cmd, sus);
+                    event.setCancelled(true);
+                    spamCount.put(id, 0);          // Reset after flag
+                    lastCommand.put(id, now);
+                }
+                return;
+            }
         }
+
+        // --- 2) Detect Cooldown Spam ---
+        if (lastCommand.containsKey(id) && (now - lastCommand.get(id)) < cooldownMs) {
+            int sus = SuspicionHandler.addSuspicionPoints(id, cooldownPoints, "CommandAbuse(Cooldown)", plugin);
+            CheatReportHandler.handleSuspicionPunishment(p, plugin, "Command Spam (Cooldown)", sus);
+            event.setCancelled(true);
+            return;
+        }
+
+        // --- 3) Record Command Timestamp ---
+        lastCommand.put(id, now);
     }
 }

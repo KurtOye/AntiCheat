@@ -2,3 +2,8 @@ name: Anticheat
 version: '1.0'
 main: me.kurtoye.anticheat.Anticheat
 api-version: '1.21'
+
+commands:
+  anticheat:
+    description: Reloads the Anticheat plugin
+    usage: /<command> reload
