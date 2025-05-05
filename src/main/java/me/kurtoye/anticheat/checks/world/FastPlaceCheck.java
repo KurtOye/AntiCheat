@@ -35,7 +35,7 @@ public class FastPlaceCheck implements Listener {
         FileConfiguration config = plugin.getConfig();
 
         this.enabled = config.getBoolean("fastplace.enabled", true);
-        this.minPlaceTime = config.getLong("fastplace.min_place_time", 5);
+        this.minPlaceTime = config.getLong("fastplace.min_place_time", 1);
         this.suspicionPoints = config.getInt("fastplace.suspicion_points", 1);
     }
 

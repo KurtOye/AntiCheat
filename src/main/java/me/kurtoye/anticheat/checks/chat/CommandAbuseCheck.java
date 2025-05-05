@@ -47,11 +47,11 @@ public class CommandAbuseCheck implements Listener {
         FileConfiguration cfg = plugin.getConfig();
 
         this.enabled = cfg.getBoolean("commandabuse.enabled", true);
-        this.cooldownMs = cfg.getLong("commandabuse.cooldown", 50);
-        this.maxSpam = cfg.getInt("commandabuse.max_repeats", 4);
+        this.cooldownMs = cfg.getLong("commandabuse.cooldown", 5);
+        this.maxSpam = cfg.getInt("commandabuse.max_repeats", 5);
         this.restrictedCmds = cfg.getStringList("commandabuse.restricted_commands").toArray(new String[0]);
         this.cooldownPoints = cfg.getInt("commandabuse.cooldown_suspicion_points", 2);
-        this.restrictedPoints = cfg.getInt("commandabuse.restricted_suspicion_points", 3);
+        this.restrictedPoints = cfg.getInt("commandabuse.restricted_suspicion_points", 1);
     }
 
     /**

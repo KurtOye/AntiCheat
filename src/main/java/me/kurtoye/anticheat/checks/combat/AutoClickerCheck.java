@@ -65,7 +65,7 @@ public class AutoClickerCheck implements Listener {
         FileConfiguration cfg = plugin.getConfig();
         this.enabled = cfg.getBoolean("autoclicker.enabled", true);
         this.resetInterval = cfg.getLong("autoclicker.reset_interval_ms", 1000);
-        this.maxCps = cfg.getInt("autoclicker.max_cps_threshold", 20);
+        this.maxCps = cfg.getInt("autoclicker.max_cps_threshold", 15);
         this.consistentLimit = cfg.getInt("autoclicker.consistency_cps_limit", 15);
         this.consistentViolations = cfg.getInt("autoclicker.consistency_violations", 5);
         this.highCpsPoints = cfg.getInt("autoclicker.high_cps_suspicion_points", 3);

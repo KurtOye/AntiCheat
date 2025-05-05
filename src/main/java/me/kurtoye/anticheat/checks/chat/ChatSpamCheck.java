@@ -47,10 +47,10 @@ public class ChatSpamCheck implements Listener {
         FileConfiguration cfg = plugin.getConfig();
 
         this.enabled = cfg.getBoolean("chatspam.enabled", true);
-        this.cooldownMs = cfg.getLong("chatspam.interval_ms", 500);
+        this.cooldownMs = cfg.getLong("chatspam.interval_ms", 5);
         this.maxRepeats = cfg.getInt("chatspam.messages_per_interval", 5);
         this.cooldownPoints = cfg.getInt("chatspam.suspicion_points", 2);
-        this.repeatPoints = cfg.getInt("chatspam.repeated_suspicion_points", 2);
+        this.repeatPoints = cfg.getInt("chatspam.repeated_suspicion_points", 1);
     }
 
     /**

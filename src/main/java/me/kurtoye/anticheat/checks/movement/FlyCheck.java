@@ -46,7 +46,7 @@ public class FlyCheck implements Listener {
 
         FileConfiguration cfg = plugin.getConfig();
         this.enabled = cfg.getBoolean("flycheck.enabled", true);
-        this.maxAirTime = cfg.getLong("flycheck.max_air_time", 1000); // in ms
+        this.maxAirTime = cfg.getLong("flycheck.max_air_time", 2000); // in ms
         this.leeway = cfg.getDouble("flycheck.leeway", 1.0);
         this.suspicionPoints = cfg.getInt("flycheck.suspicion_points", 1);
     }

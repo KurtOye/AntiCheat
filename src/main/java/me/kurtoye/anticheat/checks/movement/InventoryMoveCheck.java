@@ -88,8 +88,10 @@ public class InventoryMoveCheck implements Listener {
         }
 
         // Calculate horizontal movement distance
-        Location from = event.getFrom().clone(); from.setY(0);
-        Location to = event.getTo().clone();     to.setY(0);
+        Location from = event.getFrom().clone();
+        from.setY(0);
+        Location to = event.getTo().clone();
+        to.setY(0);
 
         if (!lastPosition.containsKey(id)) {
             lastPosition.put(id, from);

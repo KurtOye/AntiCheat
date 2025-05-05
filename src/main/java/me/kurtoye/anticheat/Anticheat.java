@@ -59,7 +59,7 @@ public class Anticheat extends JavaPlugin {
     private void registerChecks() {
        // Chat
         Bukkit.getPluginManager().registerEvents(new ChatSpamCheck(this), this);
-       Bukkit.getPluginManager().registerEvents(new CommandAbuseCheck(this), this);
+        Bukkit.getPluginManager().registerEvents(new CommandAbuseCheck(this), this);
 
         // Combat
         Bukkit.getPluginManager().registerEvents(new AutoClickerCheck(this, teleportHandler), this);

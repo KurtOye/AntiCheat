@@ -82,7 +82,7 @@ public class SpeedCheck implements Listener {
         lastPosition.put(playerId, to);
         lastSpeed.put(playerId, speed);
 
-        // Calculate maximum allowed speed
+          // Calculate maximum allowed speed
         double maxAllowed = MovementUtil.getMaxAllowedSpeed(player)
                 * PingUtil.getPingCompensationFactor(player)
                 * TpsUtil.getTpsCompensationFactor()
